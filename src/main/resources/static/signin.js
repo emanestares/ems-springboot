@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Basic client-side validation
         if (!email || !password) {
-            showAlert('Please fill in both email and password', 'error');
+            showAlert('Please fill in both email and password.', 'error');
             return;
         }
 
@@ -43,10 +43,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Store token and user info
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('user', JSON.stringify(data.user));
-                window.location.href = 'dashboard.html';
+                showAlert('Sign in successful! Redirecting…', 'success');
+                setTimeout(() => { window.location.href = 'dashboard.html'; }, 800);
             } else {
                 const err = await response.json();
-                showAlert(err.message || 'Invalid email or password', 'error');
+                showAlert(err.message || 'Incorrect email or password. Please try again.', 'error');
+                // Shake the inputs to draw attention
+                document.getElementById('email').classList.add('invalid');
+                document.getElementById('password').classList.add('invalid');
+                setTimeout(() => {
+                    document.getElementById('email').classList.remove('invalid');
+                    document.getElementById('password').classList.remove('invalid');
+                }, 2000);
             }
         } catch (err) {
             showAlert('Network error. Is the backend running?', 'error');
@@ -60,7 +68,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Optional: Toggle password visibility
+    // Toggle password visibility
     const togglePw = document.getElementById('toggle-pw');
     const passwordField = document.getElementById('password');
     if (togglePw && passwordField) {
@@ -73,10 +81,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function showAlert(message, type = 'error') {
         if (alertBox) {
             alertBox.textContent = message;
-            alertBox.classList.remove('hidden');
+            // Remove all state classes, then apply the correct one
+            alertBox.classList.remove('hidden', 'error', 'success');
+            alertBox.classList.add(type);
+
             // Auto-hide after 4 seconds
             setTimeout(() => {
                 alertBox.classList.add('hidden');
+                alertBox.classList.remove('error', 'success');
             }, 4000);
         } else {
             console.error(message);
