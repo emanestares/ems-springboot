@@ -190,15 +190,23 @@ public class ReportController {
             double avgAge           = employeeService.averageAge();
 
             // Pie chart: age brackets
+            long total = allByAge.size();
+
             DefaultPieDataset<String> dataset = new DefaultPieDataset<>();
             long under25  = allByAge.stream().filter(e -> calculateAge(e.getBirthday()) > 0  && calculateAge(e.getBirthday()) < 24).count();
             long thirties = allByAge.stream().filter(e -> calculateAge(e.getBirthday()) >= 25 && calculateAge(e.getBirthday()) < 34).count();
             long forties  = allByAge.stream().filter(e -> calculateAge(e.getBirthday()) >= 35 && calculateAge(e.getBirthday()) < 44).count();
             long over50   = allByAge.stream().filter(e -> calculateAge(e.getBirthday()) >= 45).count();
-            if (under25  > 0) dataset.setValue("Under 25",  under25);
-            if (thirties > 0) dataset.setValue("25 – 34",   thirties);
-            if (forties  > 0) dataset.setValue("35 – 44",   forties);
-            if (over50   > 0) dataset.setValue("45+",        over50);
+
+            double percentUnder25 = total > 0 ? (under25  * 100.0) / total : 0;
+            double percentThirties = total > 0 ? (thirties  * 100.0) / total : 0;
+            double percentForties = total > 0 ? (forties  * 100.0) / total : 0;
+            double percentOver50 = total > 0 ? (over50  * 100.0) / total : 0;
+
+            if (under25  > 0) dataset.setValue(String.format("Under 25: %d employees (%.1f%%)", under25,  percentUnder25),  under25);
+            if (thirties > 0) dataset.setValue(String.format("25 - 34: %d employees (%.1f%%)", thirties,  percentThirties),   thirties);
+            if (forties  > 0) dataset.setValue(String.format("35 - 44: %d employees (%.1f%%)", forties,  percentForties),   forties);
+            if (over50   > 0) dataset.setValue(String.format("45+: %d employees (%.1f%%)", over50,  percentOver50),        over50);
 
             JFreeChart chart = ChartFactory.createPieChart(
                     "Employees by Age Group", dataset, true, true, false);

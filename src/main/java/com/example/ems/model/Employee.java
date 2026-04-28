@@ -56,6 +56,7 @@ public class Employee extends Person {   // INHERITANCE
     public void setDepartment(String d) { this.department = d; }
     public Double getSalary()       { return salary; }
     public void setSalary(Double s) { this.salary = s; }
+    public void setId(Integer id) { this.id = id; }
 
     // Override Person's getters to ensure JPA reads the right field
     @Override public String getFirstname() { return firstname; }
