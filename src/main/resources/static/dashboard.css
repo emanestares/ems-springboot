@@ -205,12 +205,13 @@ body {
 
 .action-btns {
     display: flex;
-    gap: 0.6rem;          /* increase spacing */
+    gap: 0.6rem;
 }
+
 .btn-edit, .btn-delete {
-    width: 40px;          /* was 32px */
-    height: 40px;         /* was 32px */
-    border-radius: 10px;  /* slightly larger radius */
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
     border: 1px solid;
     cursor: pointer;
     display: inline-flex;
@@ -218,37 +219,44 @@ body {
     justify-content: center;
     transition: all 0.15s;
 }
+
 .btn-edit svg, .btn-delete svg {
-    width: 18px;          /* was 14px */
+    width: 18px;
     height: 18px;
 }
-/* Rest of the button colors remain unchanged */
-.btn-edit   { background: var(--blue-50);  border-color: var(--blue-200); color: var(--blue-600); }
-.btn-delete { background: var(--red-50);   border-color: #fecaca;         color: var(--red-500); }
-.btn-edit:hover   { background: var(--blue-600);  color: var(--white); border-color: var(--blue-600); }
-.btn-delete:hover { background: var(--red-500);   color: var(--white); border-color: var(--red-500); }
+
+.btn-edit   { background: #eff6ff; border-color: #bfdbfe; color: #2563eb; }
+.btn-delete { background: #fef2f2; border-color: #fecaca; color: #ef4444; }
+.btn-edit:hover   { background: #2563eb; color: white; border-color: #2563eb; }
+.btn-delete:hover { background: #ef4444; color: white; border-color: #ef4444; }
 
 .btn-icon {
     background: #f0f4fa;
-    border: none;
-    border-radius: 40px;
-    width: 36px;
-    height: 36px;
+    border: 1px solid #d6e6f2;
+    border-radius: 60px;
+    padding: 0.45rem 1rem;
     display: inline-flex;
     align-items: center;
-    justify-content: center;
+    gap: 6px;
     cursor: pointer;
     transition: 0.2s;
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #2a6d9c;
+    white-space: nowrap;
 }
 
 .btn-icon svg {
-    width: 20px;
-    height: 20px;
+    width: 16px;
+    height: 16px;
     color: #2a6d9c;
+    flex-shrink: 0;
 }
 
 .btn-icon:hover {
     background: #e3edf6;
+    border-color: #b6d0e8;
 }
 
 /* Sections */
@@ -262,8 +270,8 @@ body {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(6px);}
-    to { opacity: 1; transform: translateY(0);}
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 .section-header {
@@ -281,7 +289,7 @@ body {
     margin-top: 0.2rem;
 }
 
-/* Stats grid (overview) */
+/* Stats grid */
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -321,8 +329,8 @@ body {
     height: 28px;
 }
 
-.stat-icon.blue svg { color: #1e88e5; }
-.stat-icon.green svg { color: #2e7d32; }
+.stat-icon.blue svg   { color: #1e88e5; }
+.stat-icon.green svg  { color: #2e7d32; }
 .stat-icon.orange svg { color: #f57c00; }
 .stat-icon.purple svg { color: #8b5cf6; }
 
@@ -370,7 +378,7 @@ body {
 
 .data-table th {
     text-align: left;
-    padding: 1rem 1rem;
+    padding: 1rem;
     background: #fafdff;
     color: #2f6b97;
     font-weight: 600;
@@ -490,7 +498,7 @@ body {
     background: #c53030;
 }
 
-/* ── Report Filters (dropdowns) ─────────────────────────────────────── */
+/* ── Report Filters ─────────────────────────────────────────────────── */
 .report-filters {
     display: flex;
     gap: 1.25rem;
@@ -503,7 +511,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
-    min-width: 200px;
+    min-width: 160px;
 }
 
 .filter-label {
@@ -559,6 +567,72 @@ body {
     pointer-events: none;
 }
 
+/* ── Sort toggle button ──────────────────────────────────────────────── */
+.sort-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.55rem 1rem;
+    background: white;
+    color: #1e293b;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s, color 0.2s;
+    height: 100%;
+}
+
+.sort-toggle-btn:hover {
+    border-color: #1e88e5;
+    box-shadow: 0 0 0 3px rgba(30,136,229,0.12);
+}
+
+.sort-toggle-btn.active {
+    background: #eff6ff;
+    border-color: #1e88e5;
+    color: #1e6dc7;
+}
+
+/* ── PDF download button ─────────────────────────────────────────────── */
+.btn-pdf {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.55rem 1.1rem;
+    background: #1e88e5;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 0.83rem;
+    font-weight: 600;
+    font-family: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+    box-shadow: 0 2px 8px rgba(30,136,229,0.22);
+}
+
+.btn-pdf:hover {
+    background: #0b5e9e;
+    box-shadow: 0 4px 14px rgba(30,136,229,0.32);
+    transform: translateY(-1px);
+}
+
+.btn-pdf svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+}
+
+.report-pdf-group {
+    min-width: auto;
+}
+
 /* ── Department colour badges ───────────────────────────────────────── */
 .dept-badge { border-radius: 6px; padding: 2px 9px; font-size: 0.78rem; font-weight: 600; display: inline-block; }
 
@@ -586,10 +660,8 @@ body {
 /* Modal */
 .modal-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
     background: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(2px);
     display: flex;
@@ -751,5 +823,12 @@ body {
     .form-row {
         flex-direction: column;
         gap: 0;
+    }
+    .report-filters {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .report-filter-group {
+        min-width: 100%;
     }
 }

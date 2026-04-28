@@ -3,10 +3,11 @@ const AUTH_API = 'http://localhost:8080/api/auth';
 const EMP_API  = 'http://localhost:8080/api/employees';
 
 /* ── State ─────────────────────────────────────────────────────────────── */
-let employees   = [];
-let editingId   = null;
+let employees    = [];
+let editingId    = null;
 let deleteTarget = null;
-let searchTimer = null;
+let searchTimer  = null;
+let sortOrder    = 'asc';
 
 /* ── DOM refs ──────────────────────────────────────────────────────────── */
 const adminNameEl  = document.getElementById('admin-name');
@@ -32,12 +33,13 @@ window.addEventListener('DOMContentLoaded', () => {
     initConfirmModal();
     initSearch();
     initReportFilters();
+    initSortToggle();
 
     refreshBtn.addEventListener('click', () => {
         const active = document.querySelector('.section.active');
-        if (active?.id === 'section-overview')   { loadStats(); loadEmployees(); }
-        if (active?.id === 'section-employees')  loadEmployees();
-        if (active?.id === 'section-reports')    triggerActiveReport();
+        if (active?.id === 'section-overview')  { loadStats(); loadEmployees(); }
+        if (active?.id === 'section-employees') loadEmployees();
+        if (active?.id === 'section-reports')   triggerActiveReport();
     });
 
     menuToggle.addEventListener('click', () => sidebar.classList.toggle('open'));
@@ -192,12 +194,12 @@ window.openEditModal = function(id) {
     editingId = id;
     document.getElementById('modal-title').textContent = 'Edit Employee';
     document.getElementById('save-btn').querySelector('.btn-text').textContent = 'Update Employee';
-    document.getElementById('emp-id').value        = emp.id;
-    document.getElementById('emp-firstname').value = emp.firstname || '';
-    document.getElementById('emp-lastname').value  = emp.lastname  || '';
-    document.getElementById('emp-birthday').value  = emp.birthday  || '';
-    document.getElementById('emp-department').value= emp.department|| '';
-    document.getElementById('emp-salary').value    = emp.salary    ?? '';
+    document.getElementById('emp-id').value         = emp.id;
+    document.getElementById('emp-firstname').value  = emp.firstname  || '';
+    document.getElementById('emp-lastname').value   = emp.lastname   || '';
+    document.getElementById('emp-birthday').value   = emp.birthday   || '';
+    document.getElementById('emp-department').value = emp.department || '';
+    document.getElementById('emp-salary').value     = emp.salary     ?? '';
     clearModalErrors();
     document.getElementById('emp-modal').classList.remove('hidden');
 };
@@ -224,8 +226,8 @@ function validateEmpForm() {
     const ln   = document.getElementById('emp-lastname');
     const dept = document.getElementById('emp-department');
     const sal  = document.getElementById('emp-salary');
-    if (!ln.value.trim())   { setFErr(ln, 'eln-err', 'Last name is required.'); ok = false; }
-    if (!dept.value.trim()) { setFErr(dept, 'edept-err', 'Department is required.'); ok = false; }
+    if (!ln.value.trim())   { setFErr(ln,   'eln-err',   'Last name is required.');             ok = false; }
+    if (!dept.value.trim()) { setFErr(dept, 'edept-err', 'Department is required.');            ok = false; }
     if (!sal.value || isNaN(sal.value) || Number(sal.value) < 0) { setFErr(sal, 'esal-err', 'Enter a valid salary (≥ 0).'); ok = false; }
     return ok;
 }
@@ -301,21 +303,21 @@ async function doDelete() {
     } catch (e) { showToast('Cannot connect to server.', 'error'); }
 }
 
-/* ── Reports ───────────────────────────────────────────────────────────────────── */
+/* ── Reports ───────────────────────────────────────────────────────────── */
 
 /* Department colour map */
 const DEPT_COLORS = {
-    engineering: 'dept-engineering',
-    hr: 'dept-hr',
+    engineering:       'dept-engineering',
+    hr:                'dept-hr',
     'human resources': 'dept-hr',
-    finance: 'dept-finance',
-    marketing: 'dept-marketing',
-    operations: 'dept-operations',
-    sales: 'dept-sales',
-    it: 'dept-it',
-    legal: 'dept-legal',
-    design: 'dept-design',
-    product: 'dept-product',
+    finance:           'dept-finance',
+    marketing:         'dept-marketing',
+    operations:        'dept-operations',
+    sales:             'dept-sales',
+    it:                'dept-it',
+    legal:             'dept-legal',
+    design:            'dept-design',
+    product:           'dept-product',
 };
 
 function deptClass(dept) {
@@ -342,11 +344,11 @@ function calcAge(birthday) {
 
 function ageRange(age) {
     if (age === null) return null;
-    if (age < 25)  return { key: 'under25', label: 'Under 25' };
-    if (age < 35)  return { key: '25-34',   label: '25 – 34'  };
-    if (age < 45)  return { key: '35-44',   label: '35 – 44'  };
-    if (age < 55)  return { key: '45-54',   label: '45 – 54'  };
-    return             { key: '55plus',  label: '55 & Above' };
+    if (age < 25) return { key: 'under25', label: 'Under 25' };
+    if (age < 35) return { key: '25-34',   label: '25 – 34'  };
+    if (age < 45) return { key: '35-44',   label: '35 – 44'  };
+    if (age < 55) return { key: '45-54',   label: '45 – 54'  };
+    return            { key: '55plus',  label: '55 & Above' };
 }
 
 function ageClass(key) {
@@ -357,6 +359,32 @@ function ageClass(key) {
 /* Full employee list cache for filtering */
 let reportAllEmployees = [];
 
+/* ── Sort toggle ───────────────────────────────────────────────────────── */
+function initSortToggle() {
+    const btn = document.getElementById('sort-toggle-btn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+        updateSortToggleUI();
+        applyReportFilters();
+    });
+}
+
+function updateSortToggleUI() {
+    const btn       = document.getElementById('sort-toggle-btn');
+    const label     = document.getElementById('sort-label');
+    const iconAsc   = document.getElementById('sort-icon-asc');
+    const iconDesc  = document.getElementById('sort-icon-desc');
+    if (!btn) return;
+
+    const isDesc = sortOrder === 'desc';
+    label.textContent      = isDesc ? 'Desc' : 'Asc';
+    iconAsc.style.display  = isDesc ? 'none'  : 'block';
+    iconDesc.style.display = isDesc ? 'block' : 'none';
+    btn.classList.toggle('active', isDesc);
+}
+
+/* ── Report filters ────────────────────────────────────────────────────── */
 function initReportFilters() {
     const deptSel = document.getElementById('dept-filter-select');
     const ageSel  = document.getElementById('age-filter-select');
@@ -396,21 +424,26 @@ function applyReportFilters() {
     const ageVal  = document.getElementById('age-filter-select')?.value || '';
 
     let filtered = reportAllEmployees;
+
     if (deptVal) {
         filtered = filtered.filter(e => (e.department || '').toLowerCase() === deptVal);
     }
     if (ageVal) {
         filtered = filtered.filter(e => {
-            const age  = calcAge(e.birthday);
+            const age   = calcAge(e.birthday);
             const range = ageRange(age);
             return range && range.key === ageVal;
         });
     }
 
+    /* Sort: primary = department (alpha), secondary = age (numeric).
+       sortOrder flips both keys so the whole table consistently goes
+       A→Z / youngest→oldest (asc) or Z→A / oldest→youngest (desc). */
+    const dir = sortOrder === 'asc' ? 1 : -1;
     filtered = [...filtered].sort((a, b) => {
-        const dA = (a.department || '').localeCompare(b.department || '');
+        const dA = (a.department || '').localeCompare(b.department || '') * dir;
         if (dA !== 0) return dA;
-        return (calcAge(a.birthday) ?? 99) - (calcAge(b.birthday) ?? 99);
+        return ((calcAge(a.birthday) ?? 99) - (calcAge(b.birthday) ?? 99)) * dir;
     });
 
     renderReport(filtered);
@@ -423,8 +456,8 @@ function renderReport(list) {
         return;
     }
     tbody.innerHTML = list.map(e => {
-        const age   = calcAge(e.birthday);
-        const range = ageRange(age);
+        const age      = calcAge(e.birthday);
+        const range    = ageRange(age);
         const ageBadge = range
             ? `<span class="age-badge ${ageClass(range.key)}">${esc(range.label)}</span>`
             : '<span style="color:#94a3b8">—</span>';

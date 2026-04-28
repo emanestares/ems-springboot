@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class EmployeeManagementSystemApplication {
 
     public static void main(String[] args) {
+        System.setProperty("java.awt.headless", "true"); // ensures AWT runs without display
         SpringApplication.run(EmployeeManagementSystemApplication.class, args);
     }
 
