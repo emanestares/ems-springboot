@@ -4,250 +4,484 @@
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>EMS — Dashboard</title>
-    <link rel="stylesheet" href="style.css"/>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
     <link rel="stylesheet" href="dashboard.css"/>
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
 </head>
 <body>
 
-<div class="grid-bg"></div>
-<div class="orb orb-1"></div>
-<div class="orb orb-2"></div>
-
-<!-- ══════════════════════════════════════════════════════
-     NAVBAR
-═══════════════════════════════════════════════════════ -->
-<nav class="navbar">
-    <div class="nav-brand">
-        <div class="nav-logo-icon">👥</div>
-        <span class="nav-logo-text">EMS</span>
+<!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+        <div class="brand-icon">
+            <svg viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#2563eb"/><path d="M8 22c0-3.314 3.582-6 8-6s8 2.686 8 6" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="12" r="4" stroke="#fff" stroke-width="2"/></svg>
+        </div>
+        <span class="brand-text">EMS Portal</span>
     </div>
-    <div class="nav-actions">
-        <span class="nav-user" id="navUser"></span>
-        <button class="btn-ghost btn-sm" onclick="signOut()">Sign Out</button>
-    </div>
-</nav>
 
-<!-- ══════════════════════════════════════════════════════
-     MAIN
-═══════════════════════════════════════════════════════ -->
+    <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-section="overview">
+            <svg viewBox="0 0 20 20" fill="none"><rect x="2" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+            Overview
+        </a>
+        <a href="#" class="nav-item" data-section="employees">
+            <svg viewBox="0 0 20 20" fill="none"><circle cx="8" cy="7" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M2 17c0-2.761 2.686-5 6-5s6 2.239 6 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M14 5a2 2 0 010 4M18 17c0-2-1.5-3.75-4-4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            Employees
+        </a>
+        <a href="#" class="nav-item" data-section="reports">
+            <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="2" width="14" height="16" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 7h8M6 10h8M6 13h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            Reports
+        </a>
+    </nav>
+
+    <div class="sidebar-footer">
+        <div class="admin-info">
+            <div class="admin-avatar" id="admin-avatar">A</div>
+            <div class="admin-details">
+                <span class="admin-name" id="admin-name">Admin</span>
+                <span class="admin-email" id="admin-email"></span>
+            </div>
+        </div>
+        <button class="logout-btn" id="logout-btn" title="Logout">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M7 3H4a1 1 0 00-1 1v12a1 1 0 001 1h3M10 14l4-4m0 0l-4-4m4 4H7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+    </div>
+</aside>
+
+<!-- ── Main ─────────────────────────────────────────────────────────── -->
 <main class="main-content">
 
-    <!-- ── Stats Row ── -->
-    <section class="stats-row">
-        <div class="stat-card">
-            <div class="stat-icon">👥</div>
-            <div class="stat-info">
-                <span class="stat-value" id="statTotal">—</span>
-                <span class="stat-label">Total Employees</span>
+    <!-- Top bar -->
+    <header class="topbar">
+        <button class="menu-toggle" id="menu-toggle" aria-label="Toggle menu">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+        <div class="topbar-title" id="topbar-title">Overview</div>
+        <div class="topbar-actions">
+            <button class="btn-icon" id="refresh-btn" title="Refresh">
+                <svg viewBox="0 0 30 30" fill="none"><path d="M4 4v5h5M16 16v-5h-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.93 9A8 8 0 1016 15.07" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                Refresh
+            </button>
+        </div>
+    </header>
+
+    <!-- ── SECTION: Overview ────────────────────────────────────────────── -->
+    <section class="section active" id="section-overview">
+        <div class="section-header">
+            <h2>Dashboard Overview</h2>
+            <p>Real-time workforce analytics</p>
+        </div>
+
+        <!-- Row 1: primary stats -->
+        <div class="stats-grid stats-row-primary" id="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon blue">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M17 20H7a4 4 0 01-4-4V8a4 4 0 014-4h10a4 4 0 014 4v8a4 4 0 01-4 4z" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="10" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M6 20c0-2.21 2.686-4 6-4s6 1.79 6 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </div>
+                <div class="stat-body">
+                    <div class="stat-value" id="stat-total">—</div>
+                    <div class="stat-label">Total Employees</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon teal">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/></svg>
+                </div>
+                <div class="stat-body">
+                    <div class="stat-value" id="stat-active">—</div>
+                    <div class="stat-label">Active Employees</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon green">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.5"/></svg>
+                </div>
+                <div class="stat-body">
+                    <div class="stat-value" id="stat-avg-salary">—</div>
+                    <div class="stat-label">Average Salary</div>
+                </div>
             </div>
         </div>
-        <div class="stat-card stat-card--active">
-            <div class="stat-icon">✅</div>
-            <div class="stat-info">
-                <span class="stat-value" id="statActive">—</span>
-                <span class="stat-label">Active Employees</span>
+        <!-- Row 2: secondary stats -->
+        <div class="stats-grid stats-row-secondary">
+            <div class="stat-card">
+                <div class="stat-icon orange">
+                    <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </div>
+                <div class="stat-body">
+                    <div class="stat-value" id="stat-avg-age">—</div>
+                    <div class="stat-label">Average Age</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon purple">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M3 3v18h18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M7 16l4-4 4 4 4-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <div class="stat-body">
+                    <div class="stat-value" id="stat-depts">—</div>
+                    <div class="stat-label">Departments</div>
+                </div>
             </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-icon">🏢</div>
-            <div class="stat-info">
-                <span class="stat-value" id="statDepts">—</span>
-                <span class="stat-label">Departments</span>
+
+        <div class="overview-table-card">
+            <div class="card-header">
+                <h3>Department Breakdown</h3>
             </div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-icon">💰</div>
-            <div class="stat-info">
-                <span class="stat-value" id="statAvgSalary">—</span>
-                <span class="stat-label">Avg. Salary</span>
+            <div class="table-wrap">
+                <table class="data-table" id="dept-breakdown-table">
+                    <thead>
+                    <tr><th>Department</th><th>Headcount</th><th>% of Total</th></tr>
+                    </thead>
+                    <tbody id="dept-breakdown-body">
+                    <tr><td colspan="3" class="loading-row">Loading…</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </section>
 
-    <!-- ── Toolbar ── -->
-    <section class="toolbar">
-        <div class="toolbar-left">
-            <div class="search-wrap">
-                <span class="search-icon">🔍</span>
-                <input type="text" id="searchInput" placeholder="Search employees…" oninput="filterTable()"/>
-            </div>
-            <select id="deptFilter" class="select-filter" onchange="filterTable()">
-                <option value="">All Departments</option>
-            </select>
-            <select id="statusFilter" class="select-filter" onchange="filterTable()">
-                <option value="">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-            </select>
+    <!-- ── SECTION: Employees ───────────────────────────────────────────── -->
+    <section class="section" id="section-employees">
+        <div class="section-header">
+            <h2>Employee Management</h2>
+            <p>Add, edit, search and remove employee records</p>
         </div>
-        <div class="toolbar-right">
-            <button class="btn-outline btn-sm" onclick="downloadReport('by-department')">📄 Dept Report</button>
-            <button class="btn-outline btn-sm" onclick="downloadReport('by-age')">📄 Age Report</button>
-            <button class="btn-primary" onclick="openAddModal()">+ Add Employee</button>
+
+        <div class="toolbar">
+            <div class="toolbar-left">
+                <div class="search-wrap">
+                    <svg class="search-icon" viewBox="0 0 20 20" fill="none"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="M15 15l-3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    <input type="text" id="search-input" class="search-input" placeholder="Search by name…"/>
+                </div>
+                <div class="select-wrap select-wrap-inline">
+                    <select id="status-filter" class="report-select">
+                        <option value="">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                    <svg class="select-chevron" viewBox="0 0 20 20" fill="none"><path d="M5 8l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+            </div>
+            <button class="btn-primary" id="add-emp-btn">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M10 4v12M4 10h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                Add Employee
+            </button>
+        </div>
+
+        <div class="card">
+            <div class="table-wrap">
+                <table class="data-table" id="employees-table">
+                    <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Date of Birth</th>
+                        <th>Department</th>
+                        <th>Salary</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody id="employees-body">
+                    <tr><td colspan="7" class="loading-row">Loading employees…</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </section>
 
-    <!-- ── Employee Table ── -->
-    <section class="table-card">
-        <div class="table-wrap">
-            <table class="emp-table" id="empTable">
-                <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Name</th>
-                    <th>Department</th>
-                    <th>Birthday</th>
-                    <th>Salary</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-                </thead>
-                <tbody id="empTableBody">
-                <tr>
-                    <td colspan="7" class="table-empty">Loading employees…</td>
-                </tr>
-                </tbody>
-            </table>
+    <!-- ── SECTION: Reports ─────────────────────────────────────────────── -->
+    <section class="section" id="section-reports">
+        <div class="section-header">
+            <h2>Reports</h2>
+            <p>Employee lists sorted by department or age</p>
         </div>
-        <div class="table-footer">
-            <span id="tableCount" class="table-count"></span>
+
+        <!-- Filters row -->
+        <div class="report-filters">
+
+            <!-- Department filter -->
+            <div class="report-filter-group">
+                <label for="dept-filter-select" class="filter-label">
+                    <svg viewBox="0 0 20 20" fill="none"><path d="M3 5h14M6 10h8M9 15h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    Department
+                </label>
+                <div class="select-wrap">
+                    <select id="dept-filter-select" class="report-select">
+                        <option value="">All Departments</option>
+                    </select>
+                    <svg class="select-chevron" viewBox="0 0 20 20" fill="none"><path d="M5 8l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+            </div>
+
+            <!-- Age filter -->
+            <div class="report-filter-group">
+                <label for="age-filter-select" class="filter-label">
+                    <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="13" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M7 2v4M13 2v4M3 9h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    Age Range
+                </label>
+                <div class="select-wrap">
+                    <select id="age-filter-select" class="report-select">
+                        <option value="">All Ages</option>
+                        <option value="under25">Under 25</option>
+                        <option value="25-34">25 – 34</option>
+                        <option value="35-44">35 – 44</option>
+                        <option value="45-54">45 – 54</option>
+                        <option value="55plus">55 &amp; Above</option>
+                    </select>
+                    <svg class="select-chevron" viewBox="0 0 20 20" fill="none"><path d="M5 8l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+            </div>
+
+            <!-- Status filter -->
+            <div class="report-filter-group">
+                <label for="report-status-filter" class="filter-label">
+                    <svg viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M7 10l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Status
+                </label>
+                <div class="select-wrap">
+                    <select id="report-status-filter" class="report-select">
+                        <option value="">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                    <svg class="select-chevron" viewBox="0 0 20 20" fill="none"><path d="M5 8l5 5 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+            </div>
+
+            <!-- Sort toggle -->
+            <div class="report-filter-group">
+                <label class="filter-label">
+                    <svg viewBox="0 0 20 20" fill="none"><path d="M5 5h10M5 10h7M5 15h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    Sort Order
+                </label>
+                <button class="sort-toggle-btn" id="sort-toggle-btn" title="Toggle sort order">
+                    <svg id="sort-icon-asc" viewBox="0 0 20 20" fill="none" style="width:15px;height:15px;flex-shrink:0;">
+                        <path d="M10 4v12M6 8l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <svg id="sort-icon-desc" viewBox="0 0 20 20" fill="none" style="width:15px;height:15px;flex-shrink:0;display:none;">
+                        <path d="M10 4v12M6 12l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span id="sort-label">Asc</span>
+                </button>
+            </div>
+
+            <!-- PDF download buttons -->
+            <div class="report-filter-group report-pdf-group">
+                <label class="filter-label" style="visibility:hidden">Download</label>
+                <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+                    <a id="pdf-dept-btn"
+                       class="btn-pdf"
+                       href="http://localhost:8080/api/report/pdf/by-department"
+                       target="_blank" download
+                       title="Download department PDF report">
+                        <svg viewBox="0 0 20 20" fill="none"><path d="M4 16v1a1 1 0 001 1h10a1 1 0 001-1v-1M7 10l3 3m0 0l3-3m-3 3V4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Dept. PDF
+                    </a>
+                    <a id="pdf-age-btn"
+                       class="btn-pdf"
+                       href="http://localhost:8080/api/report/pdf/by-age"
+                       target="_blank" download
+                       title="Download age PDF report">
+                        <svg viewBox="0 0 20 20" fill="none"><path d="M4 16v1a1 1 0 001 1h10a1 1 0 001-1v-1M7 10l3 3m0 0l3-3m-3 3V4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Age PDF
+                    </a>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="card">
+            <div class="table-wrap">
+                <table class="data-table" id="report-table">
+                    <thead id="report-thead">
+                    <tr><th>ID</th><th>Name</th><th>Date of Birth</th><th>Age Range</th><th>Department</th><th>Salary</th><th>Status</th></tr>
+                    </thead>
+                    <tbody id="report-body">
+                    <tr><td colspan="7" class="loading-row">Loading…</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </section>
 
 </main>
 
+<!-- ── Profile Modal ───────────────────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="profile-modal">
+    <div class="modal modal-profile">
+        <button class="modal-close" id="profile-modal-close">&times;</button>
 
-<!-- ══════════════════════════════════════════════════════
-     EMPLOYEE DETAIL MODAL
-═══════════════════════════════════════════════════════ -->
-<div class="modal-backdrop" id="detailBackdrop" onclick="closeDetailModal(event)">
-    <div class="modal modal--detail" id="detailModal">
-        <button class="modal-close" onclick="closeDetailModal()">✕</button>
-
-        <div class="detail-profile">
-            <div class="detail-avatar" id="detailAvatar">
-                <!-- SVG placeholder profile pic -->
-                <svg viewBox="0 0 80 80" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="40" cy="40" r="40" fill="#dbeafe"/>
-                    <circle cx="40" cy="32" r="14" fill="#93c5fd"/>
-                    <ellipse cx="40" cy="70" rx="22" ry="16" fill="#93c5fd"/>
-                </svg>
+        <!-- Header / Avatar -->
+        <div class="profile-header">
+            <div class="profile-avatar-wrap">
+                <div class="profile-avatar-circle" id="profile-avatar-circle">
+                    <span id="profile-avatar-initials">?</span>
+                </div>
             </div>
-            <div class="detail-header-info">
-                <h2 class="detail-name" id="detailName">—</h2>
-                <span class="detail-dept" id="detailDept">—</span>
-                <span class="detail-badge" id="detailBadge">Active</span>
+            <div class="profile-header-info">
+                <h2 class="profile-fullname" id="profile-fullname">—</h2>
+                <div class="profile-header-meta">
+                    <span id="profile-dept-badge" class="dept-badge">—</span>
+                    <span id="profile-status-pill" class="status-pill active">Active</span>
+                </div>
             </div>
         </div>
 
-        <div class="detail-grid">
-            <div class="detail-item">
-                <span class="detail-label">Employee ID</span>
-                <span class="detail-value" id="detailId">—</span>
+        <!-- Details grid -->
+        <div class="profile-grid">
+            <div class="profile-item">
+                <span class="profile-label">
+                    <svg viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M1 6h14" stroke="currentColor" stroke-width="1.3"/></svg>
+                    Employee ID
+                </span>
+                <span class="profile-value" id="profile-id">—</span>
             </div>
-            <div class="detail-item">
-                <span class="detail-label">First Name</span>
-                <span class="detail-value" id="detailFirst">—</span>
+            <div class="profile-item">
+                <span class="profile-label">
+                    <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M2 14c0-2.761 2.686-5 6-5s6 2.239 6 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                    First Name
+                </span>
+                <span class="profile-value" id="profile-firstname">—</span>
             </div>
-            <div class="detail-item">
-                <span class="detail-label">Last Name</span>
-                <span class="detail-value" id="detailLast">—</span>
+            <div class="profile-item">
+                <span class="profile-label">
+                    <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M2 14c0-2.761 2.686-5 6-5s6 2.239 6 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                    Last Name
+                </span>
+                <span class="profile-value" id="profile-lastname">—</span>
             </div>
-            <div class="detail-item">
-                <span class="detail-label">Department</span>
-                <span class="detail-value" id="detailDeptVal">—</span>
+            <div class="profile-item">
+                <span class="profile-label">
+                    <svg viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M5 1v3M11 1v3M1 6h14" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                    Date of Birth
+                </span>
+                <span class="profile-value" id="profile-birthday">—</span>
             </div>
-            <div class="detail-item">
-                <span class="detail-label">Birthday</span>
-                <span class="detail-value" id="detailBirthday">—</span>
+            <div class="profile-item">
+                <span class="profile-label">
+                    <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                    Age
+                </span>
+                <span class="profile-value" id="profile-age">—</span>
             </div>
-            <div class="detail-item">
-                <span class="detail-label">Age</span>
-                <span class="detail-value" id="detailAge">—</span>
+            <div class="profile-item">
+                <span class="profile-label">
+                    <svg viewBox="0 0 16 16" fill="none"><path d="M2 14V6l6-4 6 4v8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><rect x="5" y="9" width="3" height="5" rx="0.5" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="9" width="2" height="3" rx="0.5" stroke="currentColor" stroke-width="1.3"/></svg>
+                    Department
+                </span>
+                <span class="profile-value" id="profile-department">—</span>
             </div>
-            <div class="detail-item">
-                <span class="detail-label">Salary</span>
-                <span class="detail-value" id="detailSalary">—</span>
-            </div>
-            <div class="detail-item">
-                <span class="detail-label">Employment Status</span>
-                <span class="detail-value" id="detailStatus">—</span>
+            <div class="profile-item profile-item--full">
+                <span class="profile-label">
+                    <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M8 5v1.5m0 3V11m-2-3.5h3.5a.5.5 0 010 1H6a.5.5 0 010-1H8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                    Salary
+                </span>
+                <span class="profile-value profile-salary" id="profile-salary">—</span>
             </div>
         </div>
 
-        <div class="detail-actions">
-            <button class="btn-outline" onclick="closeDetailModal(); openEditModal(currentDetailId)">✏️ Edit</button>
-            <button class="btn-danger-outline" onclick="closeDetailModal(); deleteEmployee(currentDetailId)">🗑 Delete</button>
+        <!-- Footer actions -->
+        <div class="profile-footer">
+            <button class="btn-ghost" onclick="closeProfileModal()">Close</button>
+            <button class="btn-primary" id="profile-edit-btn">
+                <svg viewBox="0 0 20 20" fill="none"><path d="M4 13.5V16h2.5l7.372-7.372-2.5-2.5L4 13.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M13.872 4.128a1.768 1.768 0 012.5 2.5l-1.128 1.128-2.5-2.5 1.128-1.128z" stroke="currentColor" stroke-width="1.3"/></svg>
+                Edit Employee
+            </button>
         </div>
     </div>
 </div>
 
-
-<!-- ══════════════════════════════════════════════════════
-     ADD / EDIT EMPLOYEE MODAL
-═══════════════════════════════════════════════════════ -->
-<div class="modal-backdrop" id="formBackdrop" onclick="closeFormModal(event)">
-    <div class="modal modal--form" id="formModal">
+<!-- ── Modal: Add / Edit Employee ──────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="emp-modal">
+    <div class="modal">
         <div class="modal-header">
-            <h3 class="modal-title" id="formTitle">Add Employee</h3>
-            <button class="modal-close" onclick="closeFormModal()">✕</button>
+            <h3 id="modal-title">Add Employee</h3>
+            <button class="modal-close" id="modal-close">&times;</button>
         </div>
-
         <div class="modal-body">
-            <input type="hidden" id="editId"/>
-            <div class="form-grid">
-                <div class="field">
-                    <label class="field-label">First Name</label>
-                    <input type="text" id="fFirstname" class="field-input" placeholder="e.g. Juan"/>
+            <div id="modal-alert" class="alert hidden"></div>
+            <form id="emp-form" novalidate>
+                <input type="hidden" id="emp-id"/>
+                <div class="form-row">
+                    <div class="field-group">
+                        <label for="emp-firstname">First Name</label>
+                        <input type="text" id="emp-firstname" placeholder="Juan" required/>
+                        <span class="field-error" id="efn-err"></span>
+                    </div>
+                    <div class="field-group">
+                        <label for="emp-lastname">Last Name *</label>
+                        <input type="text" id="emp-lastname" placeholder="dela Cruz" required/>
+                        <span class="field-error" id="eln-err"></span>
+                    </div>
                 </div>
-                <div class="field">
-                    <label class="field-label">Last Name</label>
-                    <input type="text" id="fLastname" class="field-input" placeholder="e.g. dela Cruz"/>
+                <div class="form-row">
+                    <div class="field-group">
+                        <label for="emp-birthday">Date of Birth</label>
+                        <input type="date" id="emp-birthday"/>
+                        <span class="field-error" id="ebd-err"></span>
+                    </div>
+                    <div class="field-group">
+                        <label for="emp-department">Department *</label>
+                        <input type="text" id="emp-department" placeholder="Engineering" required/>
+                        <span class="field-error" id="edept-err"></span>
+                    </div>
                 </div>
-                <div class="field">
-                    <label class="field-label">Department</label>
-                    <input type="text" id="fDepartment" class="field-input" placeholder="e.g. Engineering"/>
+                <div class="field-group">
+                    <label for="emp-salary">Salary *</label>
+                    <input type="number" id="emp-salary" placeholder="50000" min="0" step="0.01" required/>
+                    <span class="field-error" id="esal-err"></span>
                 </div>
-                <div class="field">
-                    <label class="field-label">Birthday</label>
-                    <input type="date" id="fBirthday" class="field-input"/>
-                </div>
-                <div class="field field--full">
-                    <label class="field-label">Salary (₱)</label>
-                    <input type="number" id="fSalary" class="field-input" placeholder="e.g. 35000" min="0"/>
-                </div>
-            </div>
-            <div id="formError" class="form-error"></div>
+            </form>
         </div>
-
         <div class="modal-footer">
-            <button class="btn-ghost" onclick="closeFormModal()">Cancel</button>
-            <button class="btn-primary" id="formSubmitBtn" onclick="submitForm()">Save Employee</button>
+            <button class="btn-ghost" id="cancel-btn">Cancel</button>
+            <button class="btn-primary" id="save-btn">
+                <span class="btn-text">Save Employee</span>
+                <span class="btn-spinner hidden"></span>
+            </button>
         </div>
     </div>
 </div>
 
-
-<!-- ══════════════════════════════════════════════════════
-     DELETE CONFIRM MODAL
-═══════════════════════════════════════════════════════ -->
-<div class="modal-backdrop" id="deleteBackdrop" onclick="closeDeleteModal(event)">
-    <div class="modal modal--confirm" id="deleteModal">
-        <div class="confirm-icon">⚠️</div>
-        <h3 class="confirm-title">Delete Employee?</h3>
-        <p class="confirm-desc" id="deleteConfirmText">This action cannot be undone.</p>
-        <div class="confirm-actions">
-            <button class="btn-ghost" onclick="closeDeleteModal()">Cancel</button>
-            <button class="btn-danger" id="confirmDeleteBtn">Delete</button>
+<!-- ── Confirm Delete Modal ──────────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="confirm-modal">
+    <div class="modal modal-sm">
+        <div class="modal-header">
+            <h3>Delete Employee</h3>
+            <button class="modal-close" id="confirm-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to delete <strong id="confirm-name"></strong>? This action cannot be undone.</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-ghost" id="confirm-cancel">Cancel</button>
+            <button class="btn-danger" id="confirm-delete">Delete</button>
         </div>
     </div>
 </div>
 
+<!-- ── Confirm Deactivate Modal ───────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="toggle-modal">
+    <div class="modal modal-sm">
+        <div class="modal-header">
+            <h3 id="toggle-modal-title">Deactivate Employee</h3>
+            <button class="modal-close" id="toggle-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p id="toggle-modal-body">Are you sure you want to deactivate?</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-ghost" id="toggle-cancel">Cancel</button>
+            <button class="btn-warning" id="toggle-confirm">Confirm</button>
+        </div>
+    </div>
+</div>
 
-<!-- ══════════════════════════════════════════════════════
-     TOAST
-═══════════════════════════════════════════════════════ -->
-<div class="toast" id="toast"></div>
+<!-- ── Toast notification ─────────────────────────────────────────────── -->
+<div class="toast hidden" id="toast"></div>
 
 <script src="dashboard.js"></script>
 </body>
