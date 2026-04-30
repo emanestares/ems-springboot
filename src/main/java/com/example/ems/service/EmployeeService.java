@@ -18,10 +18,22 @@ public interface EmployeeService {
     // Reports
     List<Employee> reportByDepartment();
     List<Employee> reportByAge();
+    List<Employee> reportByAgeActive();
+    List<Employee> reportByAgeInactive();
+    List<Employee> reportByDepartmentInactive();
+    double averageSalaryInactive();
+    double averageAgeInactive();
+    Map<String, List<Employee>> groupedByDepartmentActive();
+    Map<String, List<Employee>> groupedByDepartmentInactive();
+    List<Employee> reportByDepartmentActive();
 
     // Calculations
     double averageSalary();
+    double averageSalaryActive();
     double averageAge();
+    double averageAgeActive();
     long   countActive();
     Map<String, List<Employee>> groupedByDepartment();
+
+
 }

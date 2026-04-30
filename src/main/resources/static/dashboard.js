@@ -91,9 +91,25 @@ function showSection(name) {
 }
 
 /* ── Stats ─────────────────────────────────────────────────────────────── */
+let _overviewFilter = 'active';
+
+function setOverviewFilter(filter) {
+    _overviewFilter = filter;
+    document.querySelectorAll('#overview-filter-toggle .view-toggle-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === filter);
+    });
+    const labelMap = { active: 'Active', inactive: 'Inactive', all: 'All' };
+    const label = labelMap[filter] || 'Active';
+    const salaryLabel = document.getElementById('label-avg-salary');
+    const ageLabel    = document.getElementById('label-avg-age');
+    if (salaryLabel) salaryLabel.textContent = `Average Salary (${label})`;
+    if (ageLabel)    ageLabel.textContent    = `Average Age (${label})`;
+    loadStats();
+}
+
 async function loadStats() {
     try {
-        const res  = await fetch(`${EMP_API}/stats`);
+        const res  = await fetch(`${EMP_API}/stats?filter=${_overviewFilter}`);
         const data = await res.json();
         document.getElementById('stat-total').textContent      = data.totalEmployees  ?? 0;
         document.getElementById('stat-active').textContent     = data.activeEmployees ?? 0;
@@ -101,7 +117,10 @@ async function loadStats() {
         document.getElementById('stat-avg-age').textContent    = (data.averageAge ?? 0).toFixed(1) + ' yrs';
         const deptCount = data.byDepartment ? Object.keys(data.byDepartment).length : 0;
         document.getElementById('stat-depts').textContent = deptCount;
-        renderDeptBreakdown(data.byDepartment, data.totalEmployees);
+        const headcountForBreakdown = _overviewFilter === 'all'
+            ? (data.totalEmployees ?? 0)
+            : Object.values(data.byDepartment || {}).reduce((s, arr) => s + arr.length, 0);
+        renderDeptBreakdown(data.byDepartment, headcountForBreakdown);
     } catch (e) {
         console.error('Stats load error', e);
     }
@@ -109,14 +128,29 @@ async function loadStats() {
 
 function loadDeptBreakdown() { loadStats(); }
 
+let _lastDeptMap  = null;
+let _lastTotal    = 0;
+let _deptViewMode = 'table'; // 'table' | 'pie'
+
 function renderDeptBreakdown(deptMap, total) {
-    const tbody = document.getElementById('dept-breakdown-body');
+    _lastDeptMap = deptMap;
+    _lastTotal   = total;
+    if (_deptViewMode === 'pie') {
+        renderDeptPie(deptMap, total);
+    } else {
+        renderDeptTable(deptMap, total);
+    }
+}
+
+function renderDeptTable(deptMap, total) {
+    const wrap = document.getElementById('dept-breakdown-wrap');
+    if (!wrap) return;
     if (!deptMap || Object.keys(deptMap).length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="loading-row">No data yet.</td></tr>';
+        wrap.innerHTML = '<table class="data-table" id="dept-breakdown-table"><thead><tr><th>Department</th><th>Headcount</th><th>% of Total</th></tr></thead><tbody><tr><td colspan="3" class="loading-row">No data yet.</td></tr></tbody></table>';
         return;
     }
     const sorted = Object.entries(deptMap).sort((a, b) => b[1].length - a[1].length);
-    tbody.innerHTML = sorted.map(([dept, emps]) => {
+    const rows = sorted.map(([dept, emps]) => {
         const pct = total > 0 ? ((emps.length / total) * 100).toFixed(1) : 0;
         return `<tr>
             <td><span class="dept-badge">${esc(dept)}</span></td>
@@ -124,6 +158,72 @@ function renderDeptBreakdown(deptMap, total) {
             <td>${pct}%</td>
         </tr>`;
     }).join('');
+    wrap.innerHTML = `<table class="data-table" id="dept-breakdown-table">
+        <thead><tr><th>Department</th><th>Headcount</th><th>% of Total</th></tr></thead>
+        <tbody>${rows}</tbody>
+    </table>`;
+}
+
+const PIE_COLORS = [
+    '#1e40af','#0369a1','#0d9488','#16a34a','#ca8a04',
+    '#c2410c','#7c3aed','#be185d','#0891b2','#4f46e5'
+];
+
+function renderDeptPie(deptMap, total) {
+    const wrap = document.getElementById('dept-breakdown-wrap');
+    if (!wrap) return;
+    if (!deptMap || Object.keys(deptMap).length === 0) {
+        wrap.innerHTML = '<p style="text-align:center;color:var(--text-muted);padding:2rem">No data yet.</p>';
+        return;
+    }
+    const sorted = Object.entries(deptMap).sort((a, b) => b[1].length - a[1].length);
+    const size = 220;
+    const cx = size / 2, cy = size / 2, r = 88, ir = 44;
+    let slices = '';
+    let legend = '';
+    let angle  = -Math.PI / 2;
+    sorted.forEach(([dept, emps], i) => {
+        const pct   = total > 0 ? emps.length / total : 0;
+        const sweep = pct * 2 * Math.PI;
+        const x1 = cx + r * Math.cos(angle);
+        const y1 = cy + r * Math.sin(angle);
+        angle += sweep;
+        const x2 = cx + r * Math.cos(angle);
+        const y2 = cy + r * Math.sin(angle);
+        const ix1 = cx + ir * Math.cos(angle);
+        const iy1 = cy + ir * Math.sin(angle);
+        const ix2 = cx + ir * Math.cos(angle - sweep);
+        const iy2 = cy + ir * Math.sin(angle - sweep);
+        const large = sweep > Math.PI ? 1 : 0;
+        const color = PIE_COLORS[i % PIE_COLORS.length];
+        const midA  = angle - sweep / 2;
+        const lx    = cx + (r + 14) * Math.cos(midA);
+        const ly    = cy + (r + 14) * Math.sin(midA);
+        const pctStr = (pct * 100).toFixed(1);
+        slices += `<path d="M${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} L${ix1},${iy1} A${ir},${ir} 0 ${large},0 ${ix2},${iy2} Z"
+            fill="${color}" stroke="white" stroke-width="1.5">
+            <title>${esc(dept)}: ${emps.length} (${pctStr}%)</title></path>`;
+        if (pct > 0.07) {
+            slices += `<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="middle"
+                font-size="9" fill="white" font-weight="600" pointer-events="none">${pctStr}%</text>`;
+        }
+        legend += `<div class="pie-legend-item">
+            <span class="pie-legend-dot" style="background:${color}"></span>
+            <span class="pie-legend-label">${esc(dept)}</span>
+            <span class="pie-legend-val">${emps.length} <span style="color:var(--text-muted)">(${pctStr}%)</span></span>
+        </div>`;
+    });
+    wrap.innerHTML = `<div class="pie-chart-wrap">
+        <svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="flex-shrink:0">${slices}</svg>
+        <div class="pie-legend">${legend}</div>
+    </div>`;
+}
+
+function switchDeptView(mode) {
+    _deptViewMode = mode;
+    document.getElementById('view-table-btn')?.classList.toggle('active', mode === 'table');
+    document.getElementById('view-pie-btn')?.classList.toggle('active', mode === 'pie');
+    if (_lastDeptMap) renderDeptBreakdown(_lastDeptMap, _lastTotal);
 }
 
 /* ── Employees list ────────────────────────────────────────────────────── */
@@ -507,7 +607,17 @@ function initReportFilters() {
     const statusSel = document.getElementById('report-status-filter');
     if (deptSel)   deptSel.addEventListener('change',   applyReportFilters);
     if (ageSel)    ageSel.addEventListener('change',    applyReportFilters);
-    if (statusSel) statusSel.addEventListener('change', applyReportFilters);
+    if (statusSel) statusSel.addEventListener('change', () => { updatePdfLinks(); applyReportFilters(); });
+    updatePdfLinks();
+}
+
+function updatePdfLinks() {
+    const statusVal = document.getElementById('report-status-filter')?.value || '';
+    const activeParam = statusVal === 'active' ? '?active=true' : statusVal === 'inactive' ? '?active=false' : '';
+    const deptBtn = document.getElementById('pdf-dept-btn');
+    const ageBtn  = document.getElementById('pdf-age-btn');
+    if (deptBtn) deptBtn.href = `http://localhost:8080/api/report/pdf/by-department${activeParam}`;
+    if (ageBtn)  ageBtn.href  = `http://localhost:8080/api/report/pdf/by-age${activeParam}`;
 }
 
 function triggerActiveReport() { loadReportData(); }

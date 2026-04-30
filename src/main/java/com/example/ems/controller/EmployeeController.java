@@ -60,13 +60,30 @@ public class EmployeeController {
     }
 
     @GetMapping("/stats")
-    public Map<String, Object> getStats() {
+    public Map<String, Object> getStats(
+            @RequestParam(required = false, defaultValue = "active") String filter) {
         Map<String, Object> stats = new LinkedHashMap<>();
-        stats.put("totalEmployees", service.findAll().size());
+        stats.put("totalEmployees",  service.findAll().size());
         stats.put("activeEmployees", service.countActive());
-        stats.put("averageSalary",  Math.round(service.averageSalary() * 100.0) / 100.0);
-        stats.put("averageAge",     Math.round(service.averageAge()    * 10.0)  / 10.0);
-        stats.put("byDepartment",   service.groupedByDepartment());
+        stats.put("filter", filter);
+
+        switch (filter) {
+            case "all" -> {
+                stats.put("averageSalary", Math.round(service.averageSalary()      * 100.0) / 100.0);
+                stats.put("averageAge",    Math.round(service.averageAge()          * 10.0)  / 10.0);
+                stats.put("byDepartment",  service.groupedByDepartment());
+            }
+            case "inactive" -> {
+                stats.put("averageSalary", Math.round(service.averageSalaryInactive() * 100.0) / 100.0);
+                stats.put("averageAge",    Math.round(service.averageAgeInactive()     * 10.0)  / 10.0);
+                stats.put("byDepartment",  service.groupedByDepartmentInactive());
+            }
+            default -> { // "active"
+                stats.put("averageSalary", Math.round(service.averageSalaryActive() * 100.0) / 100.0);
+                stats.put("averageAge",    Math.round(service.averageAgeActive()     * 10.0)  / 10.0);
+                stats.put("byDepartment",  service.groupedByDepartmentActive());
+            }
+        }
         return stats;
     }
 

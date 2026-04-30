@@ -85,8 +85,34 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     @Override
+    public List<Employee> reportByAgeActive() {
+        return repo.findAllByIsActiveTrueOrderByBirthdayAsc();
+    }
+
+    @Override
+    public List<Employee> reportByDepartmentActive() {
+        return repo.findAllByIsActiveTrueOrderByDepartmentAsc();
+    }
+
+    @Override
+    public List<Employee> reportByDepartmentInactive() {
+        return repo.findAllByIsActiveFalseOrderByDepartmentAsc();
+    }
+
+    @Override
+    public List<Employee> reportByAgeInactive() {
+        return repo.findAllByIsActiveFalseOrderByBirthdayAsc();
+    }
+
+    @Override
     public double averageSalary() {
         Double avg = repo.findAverageSalary();
+        return avg != null ? avg : 0.0;
+    }
+
+    @Override
+    public double averageSalaryActive() {
+        Double avg = repo.findAverageSalaryActive();
         return avg != null ? avg : 0.0;
     }
 
@@ -97,8 +123,42 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     @Override
+    public double averageAgeActive() {
+        Double avg = repo.findAverageAgeActive();
+        return avg != null ? avg : 0.0;
+    }
+
+    @Override
     public long countActive() {
         return repo.countByIsActiveTrue();
+    }
+
+    @Override
+    public double averageSalaryInactive() {
+        Double avg = repo.findAverageSalaryInactive();
+        return avg != null ? avg : 0.0;
+    }
+
+    @Override
+    public double averageAgeInactive() {
+        Double avg = repo.findAverageAgeInactive();
+        return avg != null ? avg : 0.0;
+    }
+
+    @Override
+    public Map<String, List<Employee>> groupedByDepartmentActive() {
+        return repo.findAllByIsActiveTrueOrderByDepartmentAsc().stream()
+                .collect(Collectors.groupingBy(
+                        e -> e.getDepartment() != null ? e.getDepartment() : "Unassigned"
+                ));
+    }
+
+    @Override
+    public Map<String, List<Employee>> groupedByDepartmentInactive() {
+        return repo.findAllByIsActiveFalseOrderByDepartmentAsc().stream()
+                .collect(Collectors.groupingBy(
+                        e -> e.getDepartment() != null ? e.getDepartment() : "Unassigned"
+                ));
     }
 
     @Override

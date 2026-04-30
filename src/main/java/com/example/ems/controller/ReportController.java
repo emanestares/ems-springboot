@@ -23,6 +23,7 @@ import java.time.Period;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/report")
@@ -35,28 +36,42 @@ public class ReportController {
         this.employeeService = employeeService;
     }
 
-    // ── GET /api/report/pdf/by-department ────────────────────────────────
+    // ── GET /api/report/pdf/by-department?active=true|false ───────────────
     @GetMapping("/pdf/by-department")
-    public ResponseEntity<byte[]> generateDepartmentReport() {
+    public ResponseEntity<byte[]> generateDepartmentReport(
+            @RequestParam(required = false) Boolean active) {
         try {
-            // 1. Fetch live data from the database
-            Map<String, List<Employee>> grouped = employeeService.groupedByDepartment();
-            List<Employee> allByDept            = employeeService.reportByDepartment();
-            double avgSalary                    = employeeService.averageSalary();
-            double avgAge                       = employeeService.averageAge();
+            // Fetch filtered employees based on active status
+            List<Employee> filteredEmployees;
+            if (active == null) {
+                filteredEmployees = employeeService.reportByDepartment();
+            } else if (active) {
+                filteredEmployees = employeeService.reportByDepartmentActive();
+            } else {
+                filteredEmployees = employeeService.reportByDepartmentInactive();
+            }
 
-            // 2. Build the pie chart dataset from real department counts
+            // Group by department for pie chart
+            Map<String, List<Employee>> grouped = filteredEmployees.stream()
+                    .collect(Collectors.groupingBy(Employee::getDepartment));
+
+            double avgSalary = filteredEmployees.stream()
+                    .mapToDouble(Employee::getSalary)
+                    .average()
+                    .orElse(0.0);
+            double avgAge = filteredEmployees.stream()
+                    .mapToDouble(e -> calculateAge(e.getBirthday()))
+                    .average()
+                    .orElse(0.0);
+
+            // Build dataset
             DefaultPieDataset<String> dataset = new DefaultPieDataset<>();
             grouped.forEach((dept, emps) -> dataset.setValue(dept, emps.size()));
 
-            // 3. Create and style the pie chart
+            // Create pie chart
             JFreeChart chart = ChartFactory.createPieChart(
-                    "Employees by Department",
-                    dataset,
-                    true,   // legend
-                    true,   // tooltips
-                    false
-            );
+                    "Employees by Department" + (active != null ? (active ? " (Active)" : " (Inactive)") : ""),
+                    dataset, true, true, false);
             chart.setBackgroundPaint(java.awt.Color.WHITE);
             PiePlot<?> plot = (PiePlot<?>) chart.getPlot();
             plot.setBackgroundPaint(java.awt.Color.WHITE);
@@ -64,18 +79,18 @@ public class ReportController {
             plot.setShadowPaint(null);
             plot.setLabelFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 11));
 
-            // 4. Render chart to PNG bytes
+            // Render chart to PNG
             BufferedImage chartImage = chart.createBufferedImage(520, 360);
             ByteArrayOutputStream chartBaos = new ByteArrayOutputStream();
             ImageIO.write(chartImage, "png", chartBaos);
 
-            // 5. Build the PDF
+            // Build PDF (using filteredEmployees)
             ByteArrayOutputStream pdfBaos = new ByteArrayOutputStream();
             Document document = new Document(PageSize.A4, 50, 50, 60, 50);
             PdfWriter.getInstance(document, pdfBaos);
             document.open();
 
-            // ── Fonts ────────────────────────────────────────────────────
+            // Fonts
             Font titleFont    = FontFactory.getFont(FontFactory.HELVETICA_BOLD,  20, new BaseColor(30, 64, 175));
             Font subtitleFont = FontFactory.getFont(FontFactory.HELVETICA,       11, new BaseColor(107, 114, 128));
             Font sectionFont  = FontFactory.getFont(FontFactory.HELVETICA_BOLD,  13, new BaseColor(30, 64, 175));
@@ -84,45 +99,42 @@ public class ReportController {
             Font statLabelFont= FontFactory.getFont(FontFactory.HELVETICA,       9,  new BaseColor(107,114,128));
             Font statValFont  = FontFactory.getFont(FontFactory.HELVETICA_BOLD,  13, new BaseColor(17, 24, 39));
 
-            // ── Title block ───────────────────────────────────────────────
+            // Title
             Paragraph title = new Paragraph("Employee Management System", titleFont);
             title.setAlignment(Element.ALIGN_CENTER);
             document.add(title);
 
-            Paragraph subtitle = new Paragraph(
-                    "Department Report  ·  Generated: "
-                            + LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM d, yyyy")),
-                    subtitleFont);
+            String subtitleText = "Department Report" +
+                    (active != null ? (active ? " · Active Employees Only" : " · Inactive Employees Only") : "") +
+                    " · Generated: " + LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM d, yyyy"));
+            Paragraph subtitle = new Paragraph(subtitleText, subtitleFont);
             subtitle.setAlignment(Element.ALIGN_CENTER);
             subtitle.setSpacingAfter(18);
             document.add(subtitle);
 
-            // ── Summary stats row (3-column table) ────────────────────────
-            PdfPTable statsTable = new PdfPTable(3);
+            // Stats table
+            String statusLabel = active == null ? "All" : (active ? "Active Only" : "Inactive Only");
+            PdfPTable statsTable = new PdfPTable(4);
             statsTable.setWidthPercentage(100);
             statsTable.setSpacingAfter(18);
-            statsTable.setWidths(new float[]{1f, 1f, 1f});
-
-            addStatCell(statsTable, String.valueOf(employeeService.findAll().size()),
-                    "Total Employees",  statValFont, statLabelFont);
-            addStatCell(statsTable, String.format("₱%,.2f", avgSalary),
-                    "Average Salary",   statValFont, statLabelFont);
-            addStatCell(statsTable, String.format("%.1f yrs", avgAge),
-                    "Average Age",      statValFont, statLabelFont);
+            statsTable.setWidths(new float[]{1f, 1f, 1f, 1f});
+            addStatCell(statsTable, String.valueOf(filteredEmployees.size()), "Total Employees", statValFont, statLabelFont);
+            addStatCell(statsTable, String.format("₱%,.2f", avgSalary), "Average Salary", statValFont, statLabelFont);
+            addStatCell(statsTable, String.format("%.1f yrs", avgAge), "Average Age", statValFont, statLabelFont);
+            addStatCell(statsTable, statusLabel, "Status Filter", statValFont, statLabelFont);
             document.add(statsTable);
 
-            // ── Pie chart ─────────────────────────────────────────────────
+            // Pie chart
             Paragraph chartHeading = new Paragraph("Department Distribution", sectionFont);
             chartHeading.setSpacingAfter(8);
             document.add(chartHeading);
-
             Image chartImg = Image.getInstance(chartBaos.toByteArray());
             chartImg.setAlignment(Element.ALIGN_CENTER);
             chartImg.scaleToFit(480, 340);
             chartImg.setSpacingAfter(20);
             document.add(chartImg);
 
-            // ── Employee table ────────────────────────────────────────────
+            // Employee table
             Paragraph tableHeading = new Paragraph("Employee Directory (sorted by Department)", sectionFont);
             tableHeading.setSpacingAfter(8);
             document.add(tableHeading);
@@ -133,44 +145,42 @@ public class ReportController {
             empTable.setHeaderRows(1);
 
             BaseColor headerBg = new BaseColor(30, 64, 175);
-            addTableHeader(empTable, "ID",         headerFont, headerBg);
-            addTableHeader(empTable, "Full Name",  headerFont, headerBg);
+            addTableHeader(empTable, "ID", headerFont, headerBg);
+            addTableHeader(empTable, "Full Name", headerFont, headerBg);
             addTableHeader(empTable, "Department", headerFont, headerBg);
-            addTableHeader(empTable, "Birthday",   headerFont, headerBg);
-            addTableHeader(empTable, "Salary",     headerFont, headerBg);
+            addTableHeader(empTable, "Birthday", headerFont, headerBg);
+            addTableHeader(empTable, "Salary", headerFont, headerBg);
 
             boolean stripe = false;
             BaseColor rowLight = new BaseColor(239, 246, 255);
             DateTimeFormatter df = DateTimeFormatter.ofPattern("MMM d, yyyy");
 
-            for (Employee e : allByDept) {
+            for (Employee e : filteredEmployees) {
                 BaseColor bg = stripe ? rowLight : BaseColor.WHITE;
-                String name  = (e.getFirstname() != null ? e.getFirstname() : "") + " " + e.getLastname();
-                String bday  = e.getBirthday() != null ? e.getBirthday().format(df) : "—";
-                String sal   = e.getSalary() != null ? String.format("₱%,.2f", e.getSalary()) : "—";
+                String name = (e.getFirstname() != null ? e.getFirstname() : "") + " " + e.getLastname();
+                String bday = e.getBirthday() != null ? e.getBirthday().format(df) : "—";
+                String sal = e.getSalary() != null ? String.format("₱%,.2f", e.getSalary()) : "—";
 
                 addTableCell(empTable, String.valueOf(e.getId()), cellFont, bg, Element.ALIGN_CENTER);
-                addTableCell(empTable, name.trim(),               cellFont, bg, Element.ALIGN_LEFT);
-                addTableCell(empTable, e.getDepartment(),         cellFont, bg, Element.ALIGN_LEFT);
-                addTableCell(empTable, bday,                      cellFont, bg, Element.ALIGN_CENTER);
-                addTableCell(empTable, sal,                       cellFont, bg, Element.ALIGN_RIGHT);
+                addTableCell(empTable, name.trim(), cellFont, bg, Element.ALIGN_LEFT);
+                addTableCell(empTable, e.getDepartment(), cellFont, bg, Element.ALIGN_LEFT);
+                addTableCell(empTable, bday, cellFont, bg, Element.ALIGN_CENTER);
+                addTableCell(empTable, sal, cellFont, bg, Element.ALIGN_RIGHT);
                 stripe = !stripe;
             }
-
             document.add(empTable);
 
-            // ── Footer ────────────────────────────────────────────────────
-            Paragraph footer = new Paragraph(
-                    "\nEMS Portal  ·  Confidential  ·  " + LocalDate.now().getYear(),
+            // Footer
+            Paragraph footer = new Paragraph("\nEMS Portal · Confidential · " + LocalDate.now().getYear(),
                     FontFactory.getFont(FontFactory.HELVETICA, 8, new BaseColor(156, 163, 175)));
             footer.setAlignment(Element.ALIGN_CENTER);
             footer.setSpacingBefore(20);
             document.add(footer);
-
             document.close();
 
-            // 6. Stream PDF to browser
-            String filename = "ems-department-report-" + LocalDate.now() + ".pdf";
+            String filename = "ems-department-report" +
+                    (active != null ? (active ? "-active" : "-inactive") : "") +
+                    "-" + LocalDate.now() + ".pdf";
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
                     .contentType(MediaType.APPLICATION_PDF)
@@ -182,34 +192,41 @@ public class ReportController {
         }
     }
 
-    // ── GET /api/report/pdf/by-age ───────────────────────────────────────
+    // ── GET /api/report/pdf/by-age?active=true|false ──────────────────────
     @GetMapping("/pdf/by-age")
-    public ResponseEntity<byte[]> generateAgeReport() {
+    public ResponseEntity<byte[]> generateAgeReport(
+            @RequestParam(required = false) Boolean active) {
         try {
-            List<Employee> allByAge = employeeService.reportByAge();
-            double avgAge           = employeeService.averageAge();
+            List<Employee> filteredEmployees;
+            if (active == null) {
+                filteredEmployees = employeeService.reportByAge();
+            } else if (active) {
+                filteredEmployees = employeeService.reportByAgeActive();
+            } else {
+                filteredEmployees = employeeService.reportByAgeInactive();
+            }
 
-            // Pie chart: age brackets
-            long total = allByAge.size();
+            double avgAge = filteredEmployees.stream()
+                    .mapToDouble(e -> calculateAge(e.getBirthday()))
+                    .average()
+                    .orElse(0.0);
 
+            // Build pie dataset with age brackets
             DefaultPieDataset<String> dataset = new DefaultPieDataset<>();
-            long under25  = allByAge.stream().filter(e -> calculateAge(e.getBirthday()) > 0  && calculateAge(e.getBirthday()) < 24).count();
-            long thirties = allByAge.stream().filter(e -> calculateAge(e.getBirthday()) >= 25 && calculateAge(e.getBirthday()) < 34).count();
-            long forties  = allByAge.stream().filter(e -> calculateAge(e.getBirthday()) >= 35 && calculateAge(e.getBirthday()) < 44).count();
-            long over50   = allByAge.stream().filter(e -> calculateAge(e.getBirthday()) >= 45).count();
+            long under25 = filteredEmployees.stream().filter(e -> calculateAge(e.getBirthday()) < 25).count();
+            long age25_34 = filteredEmployees.stream().filter(e -> calculateAge(e.getBirthday()) >= 25 && calculateAge(e.getBirthday()) < 35).count();
+            long age35_44 = filteredEmployees.stream().filter(e -> calculateAge(e.getBirthday()) >= 35 && calculateAge(e.getBirthday()) < 45).count();
+            long over45 = filteredEmployees.stream().filter(e -> calculateAge(e.getBirthday()) >= 45).count();
 
-            double percentUnder25 = total > 0 ? (under25  * 100.0) / total : 0;
-            double percentThirties = total > 0 ? (thirties  * 100.0) / total : 0;
-            double percentForties = total > 0 ? (forties  * 100.0) / total : 0;
-            double percentOver50 = total > 0 ? (over50  * 100.0) / total : 0;
-
-            if (under25  > 0) dataset.setValue(String.format("Under 25: %d employees (%.1f%%)", under25,  percentUnder25),  under25);
-            if (thirties > 0) dataset.setValue(String.format("25 - 34: %d employees (%.1f%%)", thirties,  percentThirties),   thirties);
-            if (forties  > 0) dataset.setValue(String.format("35 - 44: %d employees (%.1f%%)", forties,  percentForties),   forties);
-            if (over50   > 0) dataset.setValue(String.format("45+: %d employees (%.1f%%)", over50,  percentOver50),        over50);
+            long total = filteredEmployees.size();
+            if (under25 > 0) dataset.setValue(String.format("Under 25 (%d)", under25), under25);
+            if (age25_34 > 0) dataset.setValue(String.format("25-34 (%d)", age25_34), age25_34);
+            if (age35_44 > 0) dataset.setValue(String.format("35-44 (%d)", age35_44), age35_44);
+            if (over45 > 0) dataset.setValue(String.format("45+ (%d)", over45), over45);
 
             JFreeChart chart = ChartFactory.createPieChart(
-                    "Employees by Age Group", dataset, true, true, false);
+                    "Employees by Age Group" + (active != null ? (active ? " (Active)" : " (Inactive)") : ""),
+                    dataset, true, true, false);
             chart.setBackgroundPaint(java.awt.Color.WHITE);
             PiePlot<?> plot = (PiePlot<?>) chart.getPlot();
             plot.setBackgroundPaint(java.awt.Color.WHITE);
@@ -220,50 +237,57 @@ public class ReportController {
             ByteArrayOutputStream chartBaos = new ByteArrayOutputStream();
             ImageIO.write(chartImage, "png", chartBaos);
 
+            // Build PDF (similar to department report details)
+            // ... (reuse logic, but table uses age column)
+            // For brevity, the exact same PDF building as before, but using filteredEmployees
+            // and showing age instead of birthday.
+            // (You can copy the PDF generation from your existing age report – just replace the employee list)
             ByteArrayOutputStream pdfBaos = new ByteArrayOutputStream();
             Document document = new Document(PageSize.A4, 50, 50, 60, 50);
             PdfWriter.getInstance(document, pdfBaos);
             document.open();
 
-            Font titleFont   = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 20, new BaseColor(30, 64, 175));
-            Font subtitleFont= FontFactory.getFont(FontFactory.HELVETICA,      11, new BaseColor(107,114,128));
+            // Fonts (same as above)
+            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 20, new BaseColor(30, 64, 175));
+            Font subtitleFont = FontFactory.getFont(FontFactory.HELVETICA, 11, new BaseColor(107, 114, 128));
             Font sectionFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 13, new BaseColor(30, 64, 175));
-            Font headerFont  = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, BaseColor.WHITE);
-            Font cellFont    = FontFactory.getFont(FontFactory.HELVETICA,       9, new BaseColor(55, 65, 81));
-            Font statLabelFont=FontFactory.getFont(FontFactory.HELVETICA,       9, new BaseColor(107,114,128));
+            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10, BaseColor.WHITE);
+            Font cellFont = FontFactory.getFont(FontFactory.HELVETICA, 9, new BaseColor(55, 65, 81));
+            Font statLabelFont = FontFactory.getFont(FontFactory.HELVETICA, 9, new BaseColor(107, 114, 128));
             Font statValFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 13, new BaseColor(17, 24, 39));
 
             Paragraph title = new Paragraph("Employee Management System", titleFont);
             title.setAlignment(Element.ALIGN_CENTER);
             document.add(title);
 
-            Paragraph subtitle = new Paragraph(
-                    "Age Report  ·  Generated: "
-                            + LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM d, yyyy")),
-                    subtitleFont);
+            String subtitleText = "Age Report" +
+                    (active != null ? (active ? " · Active Employees Only" : " · Inactive Employees Only") : "") +
+                    " · Generated: " + LocalDate.now().format(DateTimeFormatter.ofPattern("MMMM d, yyyy"));
+            Paragraph subtitle = new Paragraph(subtitleText, subtitleFont);
             subtitle.setAlignment(Element.ALIGN_CENTER);
             subtitle.setSpacingAfter(18);
             document.add(subtitle);
 
-            PdfPTable statsTable = new PdfPTable(2);
-            statsTable.setWidthPercentage(60);
+            String statusLabel = active == null ? "All" : (active ? "Active Only" : "Inactive Only");
+            PdfPTable statsTable = new PdfPTable(3);
+            statsTable.setWidthPercentage(80);
             statsTable.setHorizontalAlignment(Element.ALIGN_CENTER);
             statsTable.setSpacingAfter(18);
-            addStatCell(statsTable, String.valueOf(allByAge.size()), "Total Employees", statValFont, statLabelFont);
-            addStatCell(statsTable, String.format("%.1f yrs", avgAge), "Average Age",  statValFont, statLabelFont);
+            addStatCell(statsTable, String.valueOf(filteredEmployees.size()), "Total Employees", statValFont, statLabelFont);
+            addStatCell(statsTable, String.format("%.1f yrs", avgAge), "Average Age", statValFont, statLabelFont);
+            addStatCell(statsTable, statusLabel, "Status Filter", statValFont, statLabelFont);
             document.add(statsTable);
 
             Paragraph chartHeading = new Paragraph("Age Group Distribution", sectionFont);
             chartHeading.setSpacingAfter(8);
             document.add(chartHeading);
-
             Image chartImg = Image.getInstance(chartBaos.toByteArray());
             chartImg.setAlignment(Element.ALIGN_CENTER);
             chartImg.scaleToFit(480, 340);
             chartImg.setSpacingAfter(20);
             document.add(chartImg);
 
-            Paragraph tableHeading = new Paragraph("Employee Directory (sorted by Age, youngest first)", sectionFont);
+            Paragraph tableHeading = new Paragraph("Employee Directory (sorted by Age, oldest first)", sectionFont);
             tableHeading.setSpacingAfter(8);
             document.add(tableHeading);
 
@@ -273,42 +297,41 @@ public class ReportController {
             empTable.setHeaderRows(1);
 
             BaseColor headerBg = new BaseColor(30, 64, 175);
-            addTableHeader(empTable, "ID",         headerFont, headerBg);
-            addTableHeader(empTable, "Full Name",  headerFont, headerBg);
+            addTableHeader(empTable, "ID", headerFont, headerBg);
+            addTableHeader(empTable, "Full Name", headerFont, headerBg);
             addTableHeader(empTable, "Department", headerFont, headerBg);
-            addTableHeader(empTable, "Age",        headerFont, headerBg);
-            addTableHeader(empTable, "Salary",     headerFont, headerBg);
+            addTableHeader(empTable, "Age", headerFont, headerBg);
+            addTableHeader(empTable, "Salary", headerFont, headerBg);
 
             boolean stripe = false;
             BaseColor rowLight = new BaseColor(239, 246, 255);
 
-            for (Employee e : allByAge) {
+            for (Employee e : filteredEmployees) {
                 BaseColor bg = stripe ? rowLight : BaseColor.WHITE;
                 String name = (e.getFirstname() != null ? e.getFirstname() : "") + " " + e.getLastname();
-                int intAge = calculateAge(e.getBirthday());
-                String age = intAge > 0 ? intAge + " yrs" : "—";
-                String sal  = e.getSalary() != null ? String.format("₱%,.2f", e.getSalary()) : "—";
+                int age = calculateAge(e.getBirthday());
+                String ageStr = age > 0 ? age + " yrs" : "—";
+                String sal = e.getSalary() != null ? String.format("₱%,.2f", e.getSalary()) : "—";
 
                 addTableCell(empTable, String.valueOf(e.getId()), cellFont, bg, Element.ALIGN_CENTER);
-                addTableCell(empTable, name.trim(),               cellFont, bg, Element.ALIGN_LEFT);
-                addTableCell(empTable, e.getDepartment(),         cellFont, bg, Element.ALIGN_LEFT);
-                addTableCell(empTable, age,                       cellFont, bg, Element.ALIGN_CENTER);
-                addTableCell(empTable, sal,                       cellFont, bg, Element.ALIGN_RIGHT);
+                addTableCell(empTable, name.trim(), cellFont, bg, Element.ALIGN_LEFT);
+                addTableCell(empTable, e.getDepartment(), cellFont, bg, Element.ALIGN_LEFT);
+                addTableCell(empTable, ageStr, cellFont, bg, Element.ALIGN_CENTER);
+                addTableCell(empTable, sal, cellFont, bg, Element.ALIGN_RIGHT);
                 stripe = !stripe;
             }
-
             document.add(empTable);
 
-            Paragraph footer = new Paragraph(
-                    "\nEMS Portal  ·  Confidential  ·  " + LocalDate.now().getYear(),
+            Paragraph footer = new Paragraph("\nEMS Portal · Confidential · " + LocalDate.now().getYear(),
                     FontFactory.getFont(FontFactory.HELVETICA, 8, new BaseColor(156, 163, 175)));
             footer.setAlignment(Element.ALIGN_CENTER);
             footer.setSpacingBefore(20);
             document.add(footer);
-
             document.close();
 
-            String filename = "ems-age-report-" + LocalDate.now() + ".pdf";
+            String filename = "ems-age-report" +
+                    (active != null ? (active ? "-active" : "-inactive") : "") +
+                    "-" + LocalDate.now() + ".pdf";
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
                     .contentType(MediaType.APPLICATION_PDF)

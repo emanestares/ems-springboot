@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>EMS — Dashboard</title>
+    <title>EMP Lite — Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
     <link rel="stylesheet" href="dashboard.css"/>
@@ -17,7 +17,7 @@
         <div class="brand-icon">
             <svg viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="8" fill="#2563eb"/><path d="M8 22c0-3.314 3.582-6 8-6s8 2.686 8 6" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="12" r="4" stroke="#fff" stroke-width="2"/></svg>
         </div>
-        <span class="brand-text">EMS Portal</span>
+        <span class="brand-text">EMP Lite</span>
     </div>
 
     <nav class="sidebar-nav">
@@ -69,8 +69,21 @@
     <!-- ── SECTION: Overview ────────────────────────────────────────────── -->
     <section class="section active" id="section-overview">
         <div class="section-header">
-            <h2>Dashboard Overview</h2>
-            <p>Real-time workforce analytics</p>
+            <div>
+                <h2>Dashboard Overview</h2>
+                <p>Real-time workforce analytics</p>
+            </div>
+            <div class="view-toggle-group" id="overview-filter-toggle">
+                <button class="view-toggle-btn active" data-filter="active" onclick="setOverviewFilter('active')">
+                    Active
+                </button>
+                <button class="view-toggle-btn" data-filter="inactive" onclick="setOverviewFilter('inactive')">
+                    Inactive
+                </button>
+                <button class="view-toggle-btn" data-filter="all" onclick="setOverviewFilter('all')">
+                    All
+                </button>
+            </div>
         </div>
 
         <!-- Row 1: primary stats -->
@@ -99,7 +112,7 @@
                 </div>
                 <div class="stat-body">
                     <div class="stat-value" id="stat-avg-salary">—</div>
-                    <div class="stat-label">Average Salary</div>
+                    <div class="stat-label" id="label-avg-salary">Average Salary</div>
                 </div>
             </div>
         </div>
@@ -111,7 +124,7 @@
                 </div>
                 <div class="stat-body">
                     <div class="stat-value" id="stat-avg-age">—</div>
-                    <div class="stat-label">Average Age</div>
+                    <div class="stat-label" id="label-avg-age">Average Age</div>
                 </div>
             </div>
             <div class="stat-card">
@@ -128,16 +141,28 @@
         <div class="overview-table-card">
             <div class="card-header">
                 <h3>Department Breakdown</h3>
+                <div class="view-toggle-group">
+                    <button id="view-table-btn" class="view-toggle-btn active" title="Table view" onclick="switchDeptView('table')">
+                        <svg viewBox="0 0 20 20" fill="none" width="15" height="15"><rect x="2" y="4" width="16" height="3" rx="1" fill="currentColor"/><rect x="2" y="9" width="16" height="3" rx="1" fill="currentColor" opacity=".6"/><rect x="2" y="14" width="16" height="3" rx="1" fill="currentColor" opacity=".35"/></svg>
+                        Table
+                    </button>
+                    <button id="view-pie-btn" class="view-toggle-btn" title="Pie chart view" onclick="switchDeptView('pie')">
+                        <svg viewBox="0 0 20 20" fill="none" width="15" height="15"><path d="M10 2a8 8 0 100 16A8 8 0 0010 2z" stroke="currentColor" stroke-width="1.5"/><path d="M10 2v8l5.66 5.66" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                        Pie Chart
+                    </button>
+                </div>
             </div>
             <div class="table-wrap">
-                <table class="data-table" id="dept-breakdown-table">
-                    <thead>
-                    <tr><th>Department</th><th>Headcount</th><th>% of Total</th></tr>
-                    </thead>
-                    <tbody id="dept-breakdown-body">
-                    <tr><td colspan="3" class="loading-row">Loading…</td></tr>
-                    </tbody>
-                </table>
+                <div id="dept-breakdown-wrap">
+                    <table class="data-table" id="dept-breakdown-table">
+                        <thead>
+                        <tr><th>Department</th><th>Headcount</th><th>% of Total</th></tr>
+                        </thead>
+                        <tbody id="dept-breakdown-body">
+                        <tr><td colspan="3" class="loading-row">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </section>
