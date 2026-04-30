@@ -13,14 +13,14 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     private final EmployeeRepository repo;
 
-    // Constructor injection (best practice over @Autowired on field)
     public EmployeeServiceImpl(EmployeeRepository repo) {
         this.repo = repo;
     }
 
     @Override
     public Employee save(Employee emp) {
-        validate(emp);              // EXCEPTION HANDLING
+        validate(emp);
+        if (emp.getIsActive() == null) emp.setIsActive(true);
         return repo.save(emp);
     }
 
@@ -32,13 +32,12 @@ public class EmployeeServiceImpl implements EmployeeService {
 
     @Override
     public List<Employee> findAll() {
-        // COLLECTION INTERFACE: returning as ArrayList
         return new ArrayList<>(repo.findAll());
     }
 
     @Override
     public Employee update(Integer id, Employee updated) {
-        Employee existing = findById(id); // throws if not found
+        Employee existing = findById(id);
         validate(updated);
 
         existing.setFirstname(updated.getFirstname());
@@ -54,6 +53,13 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (!repo.existsById(id))
             throw new EmployeeNotFoundException(id);
         repo.deleteById(id);
+    }
+
+    @Override
+    public Employee toggleActive(Integer id) {
+        Employee emp = findById(id);
+        emp.setIsActive(!emp.getIsActive());
+        return repo.save(emp);
     }
 
     @Override
@@ -91,6 +97,11 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     @Override
+    public long countActive() {
+        return repo.countByIsActiveTrue();
+    }
+
+    @Override
     public Map<String, List<Employee>> groupedByDepartment() {
         return repo.findAll().stream()
                 .collect(Collectors.groupingBy(
@@ -98,7 +109,6 @@ public class EmployeeServiceImpl implements EmployeeService {
                 ));
     }
 
-    // VALIDATION + EXCEPTION HANDLING
     private void validate(Employee e) {
         if (e.getLastname() == null || e.getLastname().isBlank())
             throw new IllegalArgumentException("Last name cannot be empty");

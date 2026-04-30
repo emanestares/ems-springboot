@@ -10,6 +10,7 @@ public interface EmployeeService {
     List<Employee> findAll();
     Employee      update(Integer id, Employee updated);
     void          delete(Integer id);
+    Employee      toggleActive(Integer id);
 
     List<Employee> searchByName(String keyword);
     List<Employee> findByDepartment(String department);
@@ -21,5 +22,6 @@ public interface EmployeeService {
     // Calculations
     double averageSalary();
     double averageAge();
+    long   countActive();
     Map<String, List<Employee>> groupedByDepartment();
 }

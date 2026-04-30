@@ -31,6 +31,9 @@ public class Employee extends Person {   // INHERITANCE
     @Column(name = "salary")
     private Double salary;
 
+    @Column(name = "isActive", nullable = false, columnDefinition = "BOOLEAN DEFAULT TRUE")
+    private Boolean isActive = true;
+
     // --- Constructors ---
     public Employee() { super(); }
 
@@ -42,6 +45,7 @@ public class Employee extends Person {   // INHERITANCE
         this.birthday   = birthday;
         this.department = department;
         this.salary     = salary;
+        this.isActive   = true;
     }
 
     // POLYMORPHISM: Override the abstract method from Person
@@ -57,6 +61,8 @@ public class Employee extends Person {   // INHERITANCE
     public Double getSalary()       { return salary; }
     public void setSalary(Double s) { this.salary = s; }
     public void setId(Integer id) { this.id = id; }
+    public Boolean getIsActive()    { return isActive != null ? isActive : true; }
+    public void setIsActive(Boolean isActive) { this.isActive = isActive; }
 
     // Override Person's getters to ensure JPA reads the right field
     @Override public String getFirstname() { return firstname; }
