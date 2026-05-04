@@ -227,22 +227,32 @@
         <div class="section-header">
             <div>
                 <h2>Department Admin</h2>
-                <p>Manage table for departments</p>
+                <p>Manage lookup table for departments</p>
             </div>
-            <button class="btn-primary" id="add-dept-btn">+ Add Department</button>
+            <div class="dept-header-right">
+                <div class="search-wrap">
+                    <svg class="search-icon" viewBox="0 0 20 20" fill="none"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="M15 15l-3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    <input type="text" id="dept-search-input" class="search-input" placeholder="Search departments…"/>
+                </div>
+                <button class="btn-primary" id="add-dept-btn">+ Add Department</button>
+            </div>
         </div>
         <div class="card">
+            <div class="dept-card-meta">
+                <span id="dept-count-label" class="page-info"></span>
+            </div>
             <div class="table-wrap">
                 <table class="data-table">
                     <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Name</th>
-                            <th>Actions</th>
-                        </tr>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Employees</th>
+                        <th>Actions</th>
+                    </tr>
                     </thead>
                     <tbody id="dept-table-body">
-                        <tr><td colspan="3" class="loading-row">Loading…</td></tr>
+                    <tr><td colspan="4" class="loading-row">Loading…</td></tr>
                     </tbody>
                 </table>
             </div>

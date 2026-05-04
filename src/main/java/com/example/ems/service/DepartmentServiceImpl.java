@@ -61,11 +61,8 @@ public class DepartmentServiceImpl implements DepartmentService {
     @Override
     public void delete(Integer id) {
         Department dept = findById(id);
-        // Prevent deletion if employees are still assigned
-        boolean hasEmployees = empRepo.findAll().stream()
-                .anyMatch(e -> e.getDepartment() != null
-                        && e.getDepartment().getId().equals(id));
-        if (hasEmployees) {
+        // Use a targeted count query instead of loading all employees
+        if (deptRepo.countEmployeesByDepartmentId(id) > 0) {
             throw new IllegalStateException(msgInUse);
         }
         deptRepo.delete(dept);

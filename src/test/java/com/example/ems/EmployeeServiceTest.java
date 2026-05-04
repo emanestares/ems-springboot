@@ -1,13 +1,17 @@
 package com.example.ems;
 
 import com.example.ems.exception.EmployeeNotFoundException;
+import com.example.ems.model.Department;
 import com.example.ems.model.Employee;
+import com.example.ems.repository.DepartmentRepository;
 import com.example.ems.repository.EmployeeRepository;
 import com.example.ems.service.EmployeeServiceImpl;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.*;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -18,18 +22,28 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class EmployeeServiceTest {
 
-    @Mock
-    EmployeeRepository repo;
+    @Mock EmployeeRepository   repo;
+    @Mock DepartmentRepository deptRepo;
 
-    @InjectMocks
-    EmployeeServiceImpl service;
+    @InjectMocks EmployeeServiceImpl service;
 
-    private Employee sample;
+    private Department dept;
+    private Employee   sample;
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(service, "msgLastnameRequired", "Last name cannot be empty.");
+        ReflectionTestUtils.setField(service, "msgSalaryNegative",   "Salary cannot be negative.");
+        ReflectionTestUtils.setField(service, "msgAgeInvalid",       "Age must be between 16 and 100.");
+        ReflectionTestUtils.setField(service, "msgDeptRequired",     "Department is required.");
+        ReflectionTestUtils.setField(service, "msgDeptNotFound",     "Department not found with the given ID.");
+        ReflectionTestUtils.setField(service, "defaultPageSize",     5);
+
+        dept = new Department("Engineering");
+        dept.setId(1);
+
         sample = new Employee("Juan", "Dela Cruz",
-                LocalDate.of(1990, 6, 15), "Engineering", 55000.0);
+                LocalDate.of(1990, 6, 15), dept, 55000.0);
         sample.setId(1);
     }
 
@@ -37,9 +51,11 @@ class EmployeeServiceTest {
 
     @Test
     @DisplayName("findAll returns all employees")
-    void testFindAll_returnsAllEmployees() {
+    void testFindAll_returnsAll() {
+        Department hr = new Department("HR");
+        hr.setId(2);
         Employee e2 = new Employee("Maria", "Santos",
-                LocalDate.of(1995, 3, 20), "HR", 45000.0);
+                LocalDate.of(1995, 3, 20), hr, 45000.0);
         e2.setId(2);
 
         when(repo.findAll()).thenReturn(List.of(sample, e2));
@@ -64,15 +80,15 @@ class EmployeeServiceTest {
     // ── FIND BY ID ────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("findById returns correct employee when found")
+    @DisplayName("findById returns the correct employee")
     void testFindById_success() {
         when(repo.findById(1)).thenReturn(Optional.of(sample));
 
         Employee result = service.findById(1);
 
-        assertEquals("Juan", result.getFirstname());
-        assertEquals("Dela Cruz", result.getLastname());
-        assertEquals("Engineering", result.getDepartment());
+        assertEquals("Juan",         result.getFirstname());
+        assertEquals("Dela Cruz",    result.getLastname());
+        assertEquals("Engineering",  result.getDepartment().getName());
     }
 
     @Test
@@ -87,11 +103,12 @@ class EmployeeServiceTest {
         assertTrue(ex.getMessage().contains("99"));
     }
 
-    // ── SAVE ─────────────────────────────────────────────────────────────
+    // ── SAVE ──────────────────────────────────────────────────────────────
 
     @Test
     @DisplayName("save persists a valid employee and returns saved entity")
     void testSave_valid() {
+        when(deptRepo.findById(1)).thenReturn(Optional.of(dept));
         when(repo.save(sample)).thenReturn(sample);
 
         Employee result = service.save(sample);
@@ -124,9 +141,24 @@ class EmployeeServiceTest {
     }
 
     @Test
+    @DisplayName("save throws IllegalArgumentException when department is null")
+    void testSave_nullDepartment() {
+        sample.setDepartment(null);
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.save(sample));
+
+        assertTrue(ex.getMessage().toLowerCase().contains("department"));
+        verify(repo, never()).save(any());
+    }
+
+    @Test
     @DisplayName("save throws IllegalArgumentException when salary is negative")
     void testSave_negativeSalary() {
         sample.setSalary(-1.0);
+        // dept check runs before salary check — stub so it passes through to salary validation
+        when(deptRepo.findById(1)).thenReturn(Optional.of(dept));
 
         IllegalArgumentException ex = assertThrows(
                 IllegalArgumentException.class,
@@ -140,13 +172,14 @@ class EmployeeServiceTest {
     @DisplayName("save accepts salary of zero")
     void testSave_zeroSalary() {
         sample.setSalary(0.0);
+        when(deptRepo.findById(1)).thenReturn(Optional.of(dept));
         when(repo.save(sample)).thenReturn(sample);
 
         assertDoesNotThrow(() -> service.save(sample));
     }
 
     @Test
-    @DisplayName("save throws IllegalArgumentException when employee is too young (under 16)")
+    @DisplayName("save throws IllegalArgumentException when employee is under 16")
     void testSave_tooYoung() {
         sample.setBirthday(LocalDate.now().minusYears(15));
 
@@ -164,9 +197,10 @@ class EmployeeServiceTest {
     }
 
     @Test
-    @DisplayName("save accepts employee with no birthday (null)")
+    @DisplayName("save accepts employee with null birthday")
     void testSave_nullBirthday() {
         sample.setBirthday(null);
+        when(deptRepo.findById(1)).thenReturn(Optional.of(dept));
         when(repo.save(sample)).thenReturn(sample);
 
         assertDoesNotThrow(() -> service.save(sample));
@@ -177,26 +211,31 @@ class EmployeeServiceTest {
     @Test
     @DisplayName("update modifies all fields and saves")
     void testUpdate_success() {
+        Department finance = new Department("Finance");
+        finance.setId(2);
         Employee updated = new Employee("Pedro", "Reyes",
-                LocalDate.of(1988, 1, 10), "Finance", 70000.0);
+                LocalDate.of(1988, 1, 10), finance, 70000.0);
 
         when(repo.findById(1)).thenReturn(Optional.of(sample));
+        when(deptRepo.findById(2)).thenReturn(Optional.of(finance));
         when(repo.save(any(Employee.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Employee result = service.update(1, updated);
 
-        assertEquals("Pedro", result.getFirstname());
-        assertEquals("Reyes", result.getLastname());
-        assertEquals("Finance", result.getDepartment());
-        assertEquals(70000.0, result.getSalary());
+        assertEquals("Pedro",   result.getFirstname());
+        assertEquals("Reyes",   result.getLastname());
+        assertEquals("Finance", result.getDepartment().getName());
+        assertEquals(70000.0,   result.getSalary());
         verify(repo, times(1)).save(sample);
     }
 
     @Test
     @DisplayName("update throws EmployeeNotFoundException when ID does not exist")
     void testUpdate_notFound() {
+        Department it = new Department("IT");
+        it.setId(3);
         Employee updated = new Employee("X", "Y",
-                LocalDate.of(1990, 1, 1), "IT", 40000.0);
+                LocalDate.of(1990, 1, 1), it, 40000.0);
 
         when(repo.findById(99)).thenReturn(Optional.empty());
 
@@ -208,8 +247,11 @@ class EmployeeServiceTest {
     @Test
     @DisplayName("update throws IllegalArgumentException when updated data is invalid")
     void testUpdate_invalidData() {
+        Department it = new Department("IT");
+        it.setId(3);
+        // blank lastname + negative salary — both invalid
         Employee badUpdate = new Employee("", "",
-                LocalDate.of(1990, 1, 1), "IT", -500.0);
+                LocalDate.of(1990, 1, 1), it, -500.0);
 
         when(repo.findById(1)).thenReturn(Optional.of(sample));
 
@@ -240,12 +282,79 @@ class EmployeeServiceTest {
         verify(repo, never()).deleteById(anyInt());
     }
 
-    // ── SEARCH BY NAME ────────────────────────────────────────────────────
+    // ── TOGGLE ACTIVE ─────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("searchByName returns matching employees for a keyword")
+    @DisplayName("toggleActive flips isActive from true to false")
+    void testToggleActive_deactivates() {
+        sample.setIsActive(true);
+        when(repo.findById(1)).thenReturn(Optional.of(sample));
+        when(repo.save(sample)).thenReturn(sample);
+
+        Employee result = service.toggleActive(1);
+
+        assertFalse(result.getIsActive());
+        verify(repo).save(sample);
+    }
+
+    @Test
+    @DisplayName("toggleActive flips isActive from false to true")
+    void testToggleActive_activates() {
+        sample.setIsActive(false);
+        when(repo.findById(1)).thenReturn(Optional.of(sample));
+        when(repo.save(sample)).thenReturn(sample);
+
+        Employee result = service.toggleActive(1);
+
+        assertTrue(result.getIsActive());
+    }
+
+    // ── PAGINATED FIND ────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("findAllPaged returns a Page of employees")
+    void testFindAllPaged() {
+        Page<Employee> page = new PageImpl<>(List.of(sample));
+        when(repo.findAll(any(Pageable.class))).thenReturn(page);
+
+        Page<Employee> result = service.findAllPaged(0, 5);
+
+        assertEquals(1, result.getTotalElements());
+        verify(repo).findAll(any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("searchByNamePaged delegates to repo.searchByName when keyword given")
+    void testSearchByNamePaged_withKeyword() {
+        Page<Employee> page = new PageImpl<>(List.of(sample));
+        when(repo.searchByName(eq("Juan"), any(Pageable.class))).thenReturn(page);
+
+        Page<Employee> result = service.searchByNamePaged("Juan", 0, 5);
+
+        assertEquals(1, result.getContent().size());
+        verify(repo).searchByName(eq("Juan"), any(Pageable.class));
+    }
+
+    @Test
+    @DisplayName("searchByNamePaged calls findAllPaged when keyword is blank")
+    void testSearchByNamePaged_blankKeyword() {
+        Page<Employee> page = new PageImpl<>(List.of(sample));
+        when(repo.findAll(any(Pageable.class))).thenReturn(page);
+
+        Page<Employee> result = service.searchByNamePaged("   ", 0, 5);
+
+        assertEquals(1, result.getTotalElements());
+        verify(repo).findAll(any(Pageable.class));
+        verify(repo, never()).searchByName(any(), any());
+    }
+
+    // ── SEARCH UNPAGINATED ────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("searchByName delegates to repo.searchByName when keyword provided")
     void testSearchByName_withKeyword() {
-        when(repo.searchByName("Juan")).thenReturn(List.of(sample));
+        Page<Employee> page = new PageImpl<>(List.of(sample));
+        when(repo.searchByName(eq("Juan"), any(Pageable.class))).thenReturn(page);
 
         List<Employee> result = service.searchByName("Juan");
 
@@ -262,7 +371,6 @@ class EmployeeServiceTest {
 
         assertEquals(1, result.size());
         verify(repo, times(1)).findAll();
-        verify(repo, never()).searchByName(any());
     }
 
     @Test
@@ -274,66 +382,34 @@ class EmployeeServiceTest {
 
         assertEquals(1, result.size());
         verify(repo, times(1)).findAll();
-        verify(repo, never()).searchByName(any());
-    }
-
-    @Test
-    @DisplayName("searchByName trims whitespace before searching")
-    void testSearchByName_trimsWhitespace() {
-        when(repo.searchByName("Juan")).thenReturn(List.of(sample));
-
-        List<Employee> result = service.searchByName("  Juan  ");
-
-        assertEquals(1, result.size());
-        verify(repo).searchByName("Juan");
-    }
-
-    // ── FIND BY DEPARTMENT ────────────────────────────────────────────────
-
-    @Test
-    @DisplayName("findByDepartment returns employees in that department")
-    void testFindByDepartment() {
-        when(repo.findByDepartmentIgnoreCase("Engineering")).thenReturn(List.of(sample));
-
-        List<Employee> result = service.findByDepartment("Engineering");
-
-        assertEquals(1, result.size());
-        assertEquals("Engineering", result.get(0).getDepartment());
-    }
-
-    @Test
-    @DisplayName("findByDepartment is case-insensitive")
-    void testFindByDepartment_caseInsensitive() {
-        when(repo.findByDepartmentIgnoreCase("engineering")).thenReturn(List.of(sample));
-
-        List<Employee> result = service.findByDepartment("engineering");
-
-        assertFalse(result.isEmpty());
-        verify(repo).findByDepartmentIgnoreCase("engineering");
     }
 
     // ── REPORTS ───────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("reportByDepartment returns employees ordered by department")
+    @DisplayName("reportByDepartment returns employees ordered by department name")
     void testReportByDepartment() {
+        Department hr = new Department("HR");
+        hr.setId(2);
         Employee e2 = new Employee("Ana", "Lopez",
-                LocalDate.of(1993, 5, 10), "HR", 40000.0);
+                LocalDate.of(1993, 5, 10), hr, 40000.0);
 
         when(repo.findAllByOrderByDepartmentAsc()).thenReturn(List.of(e2, sample));
 
         List<Employee> result = service.reportByDepartment();
 
         assertEquals(2, result.size());
-        assertEquals("HR", result.get(0).getDepartment());
+        assertEquals("HR", result.get(0).getDepartment().getName());
         verify(repo).findAllByOrderByDepartmentAsc();
     }
 
     @Test
     @DisplayName("reportByAge returns employees ordered by birthday")
     void testReportByAge() {
+        Department it = new Department("IT");
+        it.setId(3);
         Employee older = new Employee("Carlos", "Gomez",
-                LocalDate.of(1975, 1, 1), "IT", 60000.0);
+                LocalDate.of(1975, 1, 1), it, 60000.0);
 
         when(repo.findAllByOrderByBirthdayAsc()).thenReturn(List.of(older, sample));
 
@@ -344,21 +420,19 @@ class EmployeeServiceTest {
         verify(repo).findAllByOrderByBirthdayAsc();
     }
 
-    // ── AVERAGES ──────────────────────────────────────────────────────────
+    // ── AGGREGATES ────────────────────────────────────────────────────────
 
     @Test
     @DisplayName("averageSalary returns 0 when repository returns null")
     void testAverageSalary_null() {
         when(repo.findAverageSalary()).thenReturn(null);
-
         assertEquals(0.0, service.averageSalary());
     }
 
     @Test
-    @DisplayName("averageSalary returns correct value from repository")
+    @DisplayName("averageSalary returns correct value")
     void testAverageSalary_withData() {
         when(repo.findAverageSalary()).thenReturn(55000.0);
-
         assertEquals(55000.0, service.averageSalary());
     }
 
@@ -366,25 +440,32 @@ class EmployeeServiceTest {
     @DisplayName("averageAge returns 0 when repository returns null")
     void testAverageAge_null() {
         when(repo.findAverageAge()).thenReturn(null);
-
         assertEquals(0.0, service.averageAge());
     }
 
     @Test
-    @DisplayName("averageAge returns correct value from repository")
+    @DisplayName("averageAge returns correct value")
     void testAverageAge_withData() {
         when(repo.findAverageAge()).thenReturn(32.5);
-
         assertEquals(32.5, service.averageAge());
+    }
+
+    @Test
+    @DisplayName("countActive delegates to repo.countByIsActiveTrue")
+    void testCountActive() {
+        when(repo.countByIsActiveTrue()).thenReturn(7L);
+        assertEquals(7L, service.countActive());
     }
 
     // ── GROUPED BY DEPARTMENT ─────────────────────────────────────────────
 
     @Test
-    @DisplayName("groupedByDepartment groups employees correctly")
+    @DisplayName("groupedByDepartment groups employees by department name")
     void testGroupedByDepartment() {
+        Department hr = new Department("HR");
+        hr.setId(2);
         Employee hrEmployee = new Employee("Maria", "Santos",
-                LocalDate.of(1995, 3, 20), "HR", 45000.0);
+                LocalDate.of(1995, 3, 20), hr, 45000.0);
         hrEmployee.setId(2);
 
         when(repo.findAll()).thenReturn(List.of(sample, hrEmployee));
@@ -401,9 +482,11 @@ class EmployeeServiceTest {
     @Test
     @DisplayName("groupedByDepartment assigns null department to 'Unassigned'")
     void testGroupedByDepartment_nullDepartment() {
-        Employee noDept = new Employee("Ghost", "User",
-                LocalDate.of(2000, 1, 1), null, 30000.0);
+        Employee noDept = new Employee();
         noDept.setId(3);
+        noDept.setLastname("Ghost");
+        noDept.setSalary(30000.0);
+        noDept.setDepartment(null);
 
         when(repo.findAll()).thenReturn(List.of(noDept));
 

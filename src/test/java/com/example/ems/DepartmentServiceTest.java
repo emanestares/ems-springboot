@@ -19,7 +19,7 @@ import static org.mockito.Mockito.*;
 class DepartmentServiceTest {
 
     @Mock DepartmentRepository deptRepo;
-    @Mock EmployeeRepository   empRepo;
+    @Mock EmployeeRepository   empRepo;   // kept for @InjectMocks wiring; not directly used
 
     @InjectMocks DepartmentServiceImpl service;
 
@@ -34,6 +34,7 @@ class DepartmentServiceTest {
     // ── findAll ───────────────────────────────────────────────────────────
 
     @Test
+    @DisplayName("findAll returns all departments")
     void findAll_returnsList() {
         List<Department> list = List.of(new Department("IT"), new Department("HR"));
         when(deptRepo.findAll()).thenReturn(list);
@@ -41,11 +42,21 @@ class DepartmentServiceTest {
         List<Department> result = service.findAll();
 
         assertThat(result).hasSize(2);
+        verify(deptRepo).findAll();
+    }
+
+    @Test
+    @DisplayName("findAll returns empty list when none exist")
+    void findAll_empty() {
+        when(deptRepo.findAll()).thenReturn(Collections.emptyList());
+
+        assertThat(service.findAll()).isEmpty();
     }
 
     // ── findById ──────────────────────────────────────────────────────────
 
     @Test
+    @DisplayName("findById returns the correct department")
     void findById_found() {
         Department d = new Department("Finance");
         d.setId(1);
@@ -57,6 +68,7 @@ class DepartmentServiceTest {
     }
 
     @Test
+    @DisplayName("findById throws RuntimeException when ID not found")
     void findById_notFound_throws() {
         when(deptRepo.findById(99)).thenReturn(Optional.empty());
 
@@ -68,6 +80,7 @@ class DepartmentServiceTest {
     // ── save ──────────────────────────────────────────────────────────────
 
     @Test
+    @DisplayName("save persists a new department with a unique name")
     void save_valid_savesAndReturns() {
         Department d = new Department("Marketing");
         when(deptRepo.findByNameIgnoreCase("Marketing")).thenReturn(Optional.empty());
@@ -80,8 +93,9 @@ class DepartmentServiceTest {
     }
 
     @Test
+    @DisplayName("save throws IllegalArgumentException when name is blank")
     void save_blankName_throws() {
-        Department d = new Department("");
+        Department d = new Department("  ");
 
         assertThatThrownBy(() -> service.save(d))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -89,6 +103,16 @@ class DepartmentServiceTest {
     }
 
     @Test
+    @DisplayName("save throws IllegalArgumentException when name is null")
+    void save_nullName_throws() {
+        Department d = new Department(null);
+
+        assertThatThrownBy(() -> service.save(d))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("save throws IllegalArgumentException when name already exists (case-insensitive)")
     void save_duplicateName_throws() {
         Department existing = new Department("HR");
         existing.setId(5);
@@ -104,6 +128,7 @@ class DepartmentServiceTest {
     // ── update ────────────────────────────────────────────────────────────
 
     @Test
+    @DisplayName("update changes the department name")
     void update_valid_updatesName() {
         Department existing = new Department("Sales");
         existing.setId(2);
@@ -116,16 +141,43 @@ class DepartmentServiceTest {
         Department result = service.update(2, updated);
 
         assertThat(result.getName()).isEqualTo("Sales & Marketing");
+        verify(deptRepo).save(existing);
+    }
+
+    @Test
+    @DisplayName("update allows keeping the same name (no false duplicate)")
+    void update_sameName_doesNotThrow() {
+        Department existing = new Department("HR");
+        existing.setId(3);
+        Department updated = new Department("HR");
+
+        when(deptRepo.findById(3)).thenReturn(Optional.of(existing));
+        // same name → findByNameIgnoreCase returns the same entity (same id → allowed)
+        when(deptRepo.findByNameIgnoreCase("HR")).thenReturn(Optional.of(existing));
+        when(deptRepo.save(existing)).thenReturn(existing);
+
+        assertThatCode(() -> service.update(3, updated)).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("update throws RuntimeException when department ID does not exist")
+    void update_notFound_throws() {
+        when(deptRepo.findById(99)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.update(99, new Department("X")))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("99");
     }
 
     // ── delete ────────────────────────────────────────────────────────────
 
     @Test
+    @DisplayName("delete removes the department when no employees are assigned")
     void delete_noEmployees_deletes() {
         Department d = new Department("Legal");
         d.setId(3);
         when(deptRepo.findById(3)).thenReturn(Optional.of(d));
-        when(empRepo.findAll()).thenReturn(Collections.emptyList());
+        when(deptRepo.countEmployeesByDepartmentId(3)).thenReturn(0L);
 
         service.delete(3);
 
@@ -133,18 +185,29 @@ class DepartmentServiceTest {
     }
 
     @Test
+    @DisplayName("delete throws IllegalStateException when employees are assigned")
     void delete_withEmployees_throws() {
         Department d = new Department("Engineering");
         d.setId(4);
-
-        com.example.ems.model.Employee emp = new com.example.ems.model.Employee();
-        emp.setDepartment(d);
-
         when(deptRepo.findById(4)).thenReturn(Optional.of(d));
-        when(empRepo.findAll()).thenReturn(List.of(emp));
+        when(deptRepo.countEmployeesByDepartmentId(4)).thenReturn(3L);
 
         assertThatThrownBy(() -> service.delete(4))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("assigned");
+
+        verify(deptRepo, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("delete throws RuntimeException when department ID not found")
+    void delete_notFound_throws() {
+        when(deptRepo.findById(99)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.delete(99))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("99");
+
+        verify(deptRepo, never()).delete(any());
     }
 }

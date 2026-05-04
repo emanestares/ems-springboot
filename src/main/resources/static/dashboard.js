@@ -7,6 +7,7 @@ const DEPT_API = `${BASE_URL}/api/departments`;
 /* ── State ─────────────────────────────────────────────────────────────── */
 let employees      = [];
 let departments    = [];      // lookup table cache
+let empCountByDeptId = {};    // { deptId: count } for dept admin table
 let editingId      = null;
 let deleteTarget   = null;
 let toggleTarget   = null;
@@ -128,7 +129,18 @@ function showSection(name) {
     if (name === 'employees')   loadEmployees();
     if (name === 'overview')    { loadStats(); loadDeptBreakdown(); }
     if (name === 'reports')     triggerActiveReport();
-    if (name === 'departments') loadDeptTable();
+    if (name === 'departments') {
+        loadDeptTable();
+        const dsi = document.getElementById('dept-search-input');
+        if (dsi && !dsi.dataset.wired) {
+            dsi.dataset.wired = '1';
+            dsi.addEventListener('input', () => {
+                deptSearchTerm  = dsi.value.trim();
+                deptCurrentPage = 0;
+                loadDeptTable(0);
+            });
+        }
+    }
 }
 
 /* ── Stats ─────────────────────────────────────────────────────────────── */
@@ -666,28 +678,62 @@ function initDeptAdmin() {
 /* ── Department pagination state ───────────────────────────────────────── */
 let deptCurrentPage = 0;
 const DEPT_PAGE_SIZE = 5;
+let deptSearchTerm  = '';
 
 async function loadDeptTable(page) {
     if (page === undefined) page = deptCurrentPage;
     deptCurrentPage = page;
     await loadDepartments();
+
+    // Build employee count per dept (lightweight — single paginated fetch)
+    try {
+        const empRes  = await fetch(`${EMP_API}?size=10000`);
+        const empData = await empRes.json();
+        const allEmps = empData.content || [];
+        empCountByDeptId = {};
+        allEmps.forEach(e => {
+            if (e.department?.id)
+                empCountByDeptId[e.department.id] = (empCountByDeptId[e.department.id] || 0) + 1;
+        });
+    } catch (_) {}
+
+    // Apply search filter
+    const term     = deptSearchTerm.toLowerCase();
+    const filtered = term
+        ? departments.filter(d => d.name.toLowerCase().includes(term))
+        : departments;
+
+    // Update count label
+    const label = document.getElementById('dept-count-label');
+    if (label) {
+        label.textContent = term
+            ? `${filtered.length} of ${departments.length} departments`
+            : `${departments.length} department${departments.length !== 1 ? 's' : ''}`;
+    }
+
     const tbody = document.getElementById('dept-table-body');
     if (!tbody) return;
-    if (!departments.length) {
-        tbody.innerHTML = '<tr><td colspan="3" class="loading-row">No departments yet.</td></tr>';
+
+    if (!filtered.length) {
+        const msg = term ? `No departments match "${esc(deptSearchTerm)}"` : 'No departments yet.';
+        tbody.innerHTML = `<tr><td colspan="4" class="loading-row">${msg}</td></tr>`;
         renderDeptPagination(0, 0, 0);
         return;
     }
-    const totalDept = departments.length;
-    const totalDeptPages = Math.ceil(totalDept / DEPT_PAGE_SIZE);
-    deptCurrentPage = Math.min(deptCurrentPage, Math.max(0, totalDeptPages - 1));
-    const start = deptCurrentPage * DEPT_PAGE_SIZE;
-    const pageItems = departments.slice(start, start + DEPT_PAGE_SIZE);
 
-    tbody.innerHTML = pageItems.map(d => `
+    const totalDept      = filtered.length;
+    const totalDeptPages = Math.ceil(totalDept / DEPT_PAGE_SIZE);
+    deptCurrentPage      = Math.min(deptCurrentPage, Math.max(0, totalDeptPages - 1));
+    const start    = deptCurrentPage * DEPT_PAGE_SIZE;
+    const pageItems = filtered.slice(start, start + DEPT_PAGE_SIZE);
+
+    tbody.innerHTML = pageItems.map(d => {
+        const empCount = empCountByDeptId[d.id] || 0;
+        return `
         <tr>
             <td>#${d.id}</td>
             <td>${esc(d.name)}</td>
+            <td><span class="emp-count-badge">${empCount}</span></td>
             <td>
                 <div class="action-btns">
                     <button class="btn-edit" onclick="openEditDeptModal(${d.id}, '${esc(d.name)}')" title="Edit">
@@ -698,7 +744,8 @@ async function loadDeptTable(page) {
                     </button>
                 </div>
             </td>
-        </tr>`).join('');
+        </tr>`;
+    }).join('');
 
     renderDeptPagination(deptCurrentPage, totalDeptPages, totalDept);
 }
