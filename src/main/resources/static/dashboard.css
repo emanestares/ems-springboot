@@ -692,4 +692,84 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
 }
-.pie-legend-val { font-weight: 600; white-space: nowrap; }
+.pie-legend-val { font-weight: 600; white-space: nowrap; }/* ── Append to dashboard.css ─────────────────────────────────────────────── */
+
+/* Pagination bar */
+.pagination-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .75rem;
+    padding: .75rem 1rem;
+    background: var(--surface, #fff);
+    border-top: 1px solid var(--border, #e2e8f0);
+    border-radius: 0 0 .75rem .75rem;
+    font-size: .82rem;
+    color: var(--text-muted, #64748b);
+}
+
+.page-btns {
+    display: flex;
+    gap: .35rem;
+    flex-wrap: wrap;
+}
+
+.page-btn {
+    padding: .3rem .65rem;
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: .4rem;
+    background: var(--surface, #fff);
+    color: var(--text-primary, #1e293b);
+    font-size: .8rem;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+}
+
+.page-btn:hover:not(:disabled) {
+    background: var(--primary-50, #eff6ff);
+    border-color: var(--primary, #2563eb);
+    color: var(--primary, #2563eb);
+}
+
+.page-btn.active {
+    background: var(--primary, #2563eb);
+    color: #fff;
+    border-color: var(--primary, #2563eb);
+    font-weight: 600;
+    pointer-events: none;
+}
+
+.page-btn:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+}
+
+.page-info {
+    color: var(--text-muted, #64748b);
+    font-size: .8rem;
+}
+
+/* Department admin section */
+#section-departments .section-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+}
+
+/* Make section visible when toggled by JS */
+.section { display: none; }
+.section.active { display: block; }
+
+/* Pagination ellipsis */
+.page-ellipsis {
+    display: inline-flex;
+    align-items: center;
+    padding: .3rem .4rem;
+    color: #94a3b8;
+    font-size: .8rem;
+    user-select: none;
+}

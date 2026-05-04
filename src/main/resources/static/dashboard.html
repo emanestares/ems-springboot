@@ -33,6 +33,10 @@
             <svg viewBox="0 0 20 20" fill="none"><rect x="3" y="2" width="14" height="16" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 7h8M6 10h8M6 13h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             Reports
         </a>
+        <a href="#" class="nav-item" data-section="departments">
+            <svg viewBox="0 0 20 20" fill="none"><path d="M3 17V8l7-5 7 5v9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="7" y="11" width="6" height="6" rx="0.5" stroke="currentColor" stroke-width="1.5"/></svg>
+            Departments
+        </a>
     </nav>
 
     <div class="sidebar-footer">
@@ -214,6 +218,35 @@
                     </tbody>
                 </table>
             </div>
+            <div id="pagination-controls" class="pagination-bar" style="display:none;"></div>
+        </div>
+    </section>
+
+    <!-- ── SECTION: Department Admin ──────────────────────────────────────── -->
+    <section class="section" id="section-departments">
+        <div class="section-header">
+            <div>
+                <h2>Department Admin</h2>
+                <p>Manage table for departments</p>
+            </div>
+            <button class="btn-primary" id="add-dept-btn">+ Add Department</button>
+        </div>
+        <div class="card">
+            <div class="table-wrap">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dept-table-body">
+                        <tr><td colspan="3" class="loading-row">Loading…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div id="dept-pagination" class="pagination-bar" style="display:none;"></div>
         </div>
     </section>
 
@@ -329,12 +362,11 @@
                     </tbody>
                 </table>
             </div>
+            <div id="report-pagination" class="pagination-bar" style="display:none;"></div>
         </div>
     </section>
 
 </main>
-
-<!-- ── Profile Modal ───────────────────────────────────────────────────── -->
 <div class="modal-overlay hidden" id="profile-modal">
     <div class="modal modal-profile">
         <button class="modal-close" id="profile-modal-close">&times;</button>
@@ -450,7 +482,9 @@
                     </div>
                     <div class="field-group">
                         <label for="emp-department">Department *</label>
-                        <input type="text" id="emp-department" placeholder="Engineering" required/>
+                        <select id="emp-department" required>
+                            <option value="">Select department…</option>
+                        </select>
                         <span class="field-error" id="edept-err"></span>
                     </div>
                 </div>
@@ -501,6 +535,45 @@
         <div class="modal-footer">
             <button class="btn-ghost" id="toggle-cancel">Cancel</button>
             <button class="btn-warning" id="toggle-confirm">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Department Add/Edit Modal ──────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="dept-modal">
+    <div class="modal modal-sm">
+        <div class="modal-header">
+            <h3 id="dept-modal-title">Add Department</h3>
+            <button class="modal-close" id="dept-modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="dept-modal-alert" class="alert hidden"></div>
+            <div class="field-group">
+                <label for="dept-name-input">Department Name *</label>
+                <input type="text" id="dept-name-input" placeholder="e.g. Engineering" maxlength="100"/>
+                <span class="field-error" id="dept-name-err"></span>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" id="dept-cancel-btn">Cancel</button>
+            <button class="btn-primary" id="dept-save-btn">Save</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Department Delete Confirm Modal ────────────────────────────────── -->
+<div class="modal-overlay hidden" id="dept-confirm-modal">
+    <div class="modal modal-sm">
+        <div class="modal-header">
+            <h3>Delete Department</h3>
+            <button class="modal-close" id="dept-confirm-close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p>Delete department <strong id="dept-confirm-name"></strong>? This cannot be undone. Departments with employees assigned cannot be deleted.</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" id="dept-confirm-cancel">Cancel</button>
+            <button class="btn-danger" id="dept-confirm-delete">Delete</button>
         </div>
     </div>
 </div>

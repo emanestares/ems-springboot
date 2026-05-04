@@ -1,14 +1,25 @@
-/* ── API base URLs ─────────────────────────────────────────────────────── */
-const AUTH_API = 'http://localhost:8080/api/auth';
-const EMP_API  = 'http://localhost:8080/api/employees';
+/* ── API base URLs (from urls.properties via static config) ─────────────── */
+const BASE_URL = 'http://localhost:8080';
+const AUTH_API = `${BASE_URL}/api/auth`;
+const EMP_API  = `${BASE_URL}/api/employees`;
+const DEPT_API = `${BASE_URL}/api/departments`;
 
 /* ── State ─────────────────────────────────────────────────────────────── */
 let employees      = [];
+let departments    = [];      // lookup table cache
 let editingId      = null;
 let deleteTarget   = null;
 let toggleTarget   = null;
 let searchTimer    = null;
 let sortOrder      = 'asc';
+
+/* ── Pagination state ──────────────────────────────────────────────────── */
+let currentPage    = 0;
+const PAGE_SIZE    = 5;
+let totalPages     = 0;
+let totalElements  = 0;
+let lastSearch     = '';
+let lastDeptFilter = '';
 
 /* ── DOM refs ──────────────────────────────────────────────────────────── */
 const adminNameEl  = document.getElementById('admin-name');
@@ -26,9 +37,10 @@ const toast        = document.getElementById('toast');
 let toastTimer;
 
 /* ── Init ──────────────────────────────────────────────────────────────── */
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
     loadAdminInfo();
     initNav();
+    await loadDepartments();   // load departments first (used in dropdown)
     loadStats();
     loadEmployees();
     initModal();
@@ -38,17 +50,45 @@ window.addEventListener('DOMContentLoaded', () => {
     initSearch();
     initReportFilters();
     initSortToggle();
+    initDeptAdmin();
 
     refreshBtn.addEventListener('click', () => {
         const active = document.querySelector('.section.active');
-        if (active?.id === 'section-overview')  { loadStats(); loadEmployees(); }
-        if (active?.id === 'section-employees') loadEmployees();
-        if (active?.id === 'section-reports')   triggerActiveReport();
+        if (active?.id === 'section-overview')    { loadStats(); loadEmployees(); }
+        if (active?.id === 'section-employees')   loadEmployees();
+        if (active?.id === 'section-reports')     triggerActiveReport();
+        if (active?.id === 'section-departments') loadDeptTable();
     });
 
     menuToggle.addEventListener('click', () => sidebar.classList.toggle('open'));
     logoutBtn.addEventListener('click', doLogout);
 });
+
+/* ── Departments (lookup) ──────────────────────────────────────────────── */
+async function loadDepartments() {
+    try {
+        const res = await fetch(DEPT_API);
+        departments = await res.json();
+        populateDeptDropdown_modal();
+    } catch (e) {
+        console.error('Dept load error', e);
+    }
+}
+
+function populateDeptDropdown_modal() {
+    const sel = document.getElementById('emp-department');
+    if (!sel) return;
+    const current = sel.value;
+    sel.innerHTML = '<option value="">Select department…</option>' +
+        departments.map(d =>
+            `<option value="${d.id}"${String(d.id) === String(current) ? ' selected' : ''}>${esc(d.name)}</option>`
+        ).join('');
+}
+
+function getDeptName(deptObj) {
+    if (!deptObj) return '—';
+    return deptObj.name || '—';
+}
 
 /* ── Admin info ────────────────────────────────────────────────────────── */
 function loadAdminInfo() {
@@ -82,12 +122,13 @@ function initNav() {
 function showSection(name) {
     document.querySelectorAll('.nav-item').forEach(i => i.classList.toggle('active', i.dataset.section === name));
     document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === `section-${name}`));
-    const titles = { overview: 'Overview', employees: 'Employee Management', reports: 'Reports' };
+    const titles = { overview: 'Overview', employees: 'Employee Management', reports: 'Reports', departments: 'Department Admin' };
     topbarTitle.textContent = titles[name] || name;
 
-    if (name === 'employees') loadEmployees();
-    if (name === 'overview')  { loadStats(); loadDeptBreakdown(); }
-    if (name === 'reports')   triggerActiveReport();
+    if (name === 'employees')   loadEmployees();
+    if (name === 'overview')    { loadStats(); loadDeptBreakdown(); }
+    if (name === 'reports')     triggerActiveReport();
+    if (name === 'departments') loadDeptTable();
 }
 
 /* ── Stats ─────────────────────────────────────────────────────────────── */
@@ -130,7 +171,7 @@ function loadDeptBreakdown() { loadStats(); }
 
 let _lastDeptMap  = null;
 let _lastTotal    = 0;
-let _deptViewMode = 'table'; // 'table' | 'pie'
+let _deptViewMode = 'table';
 
 function renderDeptBreakdown(deptMap, total) {
     _lastDeptMap = deptMap;
@@ -226,16 +267,27 @@ function switchDeptView(mode) {
     if (_lastDeptMap) renderDeptBreakdown(_lastDeptMap, _lastTotal);
 }
 
-/* ── Employees list ────────────────────────────────────────────────────── */
-async function loadEmployees() {
+/* ── Employees list (paginated) ────────────────────────────────────────── */
+async function loadEmployees(page = currentPage) {
+    currentPage = page;
     const tbody = document.getElementById('employees-body');
     tbody.innerHTML = '<tr><td colspan="7" class="loading-row">Loading…</td></tr>';
     try {
-        const search = searchInput.value.trim();
-        const url = search ? `${EMP_API}?search=${encodeURIComponent(search)}` : EMP_API;
-        const res  = await fetch(url);
-        employees  = await res.json();
+        lastSearch     = searchInput.value.trim();
+        lastDeptFilter = '';
+
+        const params = new URLSearchParams({ page, size: PAGE_SIZE });
+        if (lastSearch) params.set('search', lastSearch);
+
+        const res  = await fetch(`${EMP_API}?${params}`);
+        const data = await res.json();
+
+        employees     = data.content;
+        totalPages    = data.totalPages;
+        totalElements = data.totalElements;
+
         renderEmployees(applyStatusFilter(employees));
+        renderPagination();
     } catch (e) {
         tbody.innerHTML = '<tr><td colspan="7" class="loading-row">Failed to load. Is the backend running?</td></tr>';
     }
@@ -254,11 +306,13 @@ function renderEmployees(list) {
     const tbody = document.getElementById('employees-body');
     if (!list || list.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="loading-row">No employees found.</td></tr>';
+        renderPagination();
         return;
     }
     tbody.innerHTML = list.map(e => {
-        const active = e.isActive !== false;
-        const pill   = active
+        const active    = e.isActive !== false;
+        const deptName  = getDeptName(e.department);
+        const pill      = active
             ? '<span class="status-pill active">Active</span>'
             : '<span class="status-pill inactive">Inactive</span>';
         const toggleBtn = active
@@ -273,7 +327,7 @@ function renderEmployees(list) {
             <td>#${e.id}</td>
             <td><span class="emp-name">${esc(e.firstname || '')} ${esc(e.lastname || '')}</span></td>
             <td>${e.birthday ? formatDate(e.birthday) : '—'}</td>
-            <td><span class="dept-badge ${deptClass(e.department)}">${esc(e.department || '—')}</span></td>
+            <td><span class="dept-badge ${deptClass(deptName)}">${esc(deptName)}</span></td>
             <td>₱${(e.salary ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>
             <td>${pill}</td>
             <td onclick="event.stopPropagation()">
@@ -291,11 +345,49 @@ function renderEmployees(list) {
     }).join('');
 }
 
+/* ── Pagination controls ───────────────────────────────────────────────── */
+/* ── Shared smart-pagination renderer ─────────────────────────────────── */
+function buildPageButtons(current, total, onClickFn) {
+    if (total <= 1) return '';
+    // Build window: always show first, last, current ±2, with ellipsis gaps
+    const pages = new Set([0, total - 1]);
+    for (let i = Math.max(0, current - 2); i <= Math.min(total - 1, current + 2); i++) pages.add(i);
+    const sorted = [...pages].sort((a, b) => a - b);
+
+    let btns = '';
+    let prev = -1;
+    for (const p of sorted) {
+        if (p - prev > 1) btns += `<span class="page-ellipsis">…</span>`;
+        btns += `<button class="page-btn${p === current ? ' active' : ''}" onclick="${onClickFn}(${p})">${p + 1}</button>`;
+        prev = p;
+    }
+    return btns;
+}
+
+function renderPagination() {
+    const container = document.getElementById('pagination-controls');
+    if (!container) return;
+
+    if (totalPages <= 1) { container.style.display = 'none'; container.innerHTML = ''; return; }
+    container.style.display = 'flex';
+
+    const prevDis = currentPage === 0 ? 'disabled' : '';
+    const nextDis = currentPage >= totalPages - 1 ? 'disabled' : '';
+
+    container.innerHTML = `
+        <span class="page-info">Page ${currentPage + 1} of ${totalPages} &nbsp;·&nbsp; ${totalElements} records</span>
+        <div class="page-btns">
+            <button class="page-btn" onclick="loadEmployees(${currentPage - 1})" ${prevDis}>‹ Prev</button>
+            ${buildPageButtons(currentPage, totalPages, 'loadEmployees')}
+            <button class="page-btn" onclick="loadEmployees(${currentPage + 1})" ${nextDis}>Next ›</button>
+        </div>`;
+}
+
 /* ── Search & Status filter ────────────────────────────────────────────── */
 function initSearch() {
     searchInput.addEventListener('input', () => {
         clearTimeout(searchTimer);
-        searchTimer = setTimeout(() => loadEmployees(), 350);
+        searchTimer = setTimeout(() => { currentPage = 0; loadEmployees(0); }, 350);
     });
     if (statusFilter) {
         statusFilter.addEventListener('change', () => renderEmployees(applyStatusFilter(employees)));
@@ -336,13 +428,10 @@ async function doToggleActive() {
     try {
         const res = await fetch(`${EMP_API}/${toggleTarget}/toggle-active`, { method: 'PATCH' });
         if (!res.ok) { showToast('Toggle failed.', 'error'); return; }
-        const updated = await res.json();
-        const idx = employees.findIndex(e => e.id === toggleTarget);
-        if (idx !== -1) employees[idx] = updated;
         closeToggleModal();
-        renderEmployees(applyStatusFilter(employees));
+        await loadEmployees(currentPage);
         loadStats();
-        showToast(updated.isActive ? 'Employee activated.' : 'Employee deactivated.', 'success');
+        showToast('Employee status updated.', 'success');
     } catch (e) {
         showToast('Cannot connect to server.', 'error');
     }
@@ -354,34 +443,33 @@ window.openProfileModal = function(id) {
     if (!emp) return;
 
     const active    = emp.isActive !== false;
+    const deptName  = getDeptName(emp.department);
     const fullName  = `${emp.firstname || ''} ${emp.lastname || ''}`.trim();
     const initials  = [(emp.firstname || '')[0], (emp.lastname || '')[0]].filter(Boolean).join('').toUpperCase() || '?';
     const age       = calcAge(emp.birthday);
     const range     = ageRange(age);
 
-    // Avatar initials + colour based on id
     const avatarColors = ['#2563eb','#0891b2','#059669','#d97706','#7c3aed','#db2777','#dc2626','#0284c7'];
     const avatarBg = avatarColors[emp.id % avatarColors.length];
 
     document.getElementById('profile-avatar-initials').textContent = initials;
     document.getElementById('profile-avatar-circle').style.background = avatarBg;
     document.getElementById('profile-fullname').textContent   = fullName || '—';
-    document.getElementById('profile-dept-badge').textContent = emp.department || '—';
-    document.getElementById('profile-dept-badge').className   = `dept-badge ${deptClass(emp.department)}`;
+    document.getElementById('profile-dept-badge').textContent = deptName;
+    document.getElementById('profile-dept-badge').className   = `dept-badge ${deptClass(deptName)}`;
 
     const statusEl = document.getElementById('profile-status-pill');
     statusEl.textContent = active ? 'Active' : 'Inactive';
     statusEl.className   = `status-pill ${active ? 'active' : 'inactive'}`;
 
-    document.getElementById('profile-id').textContent       = `#${emp.id}`;
+    document.getElementById('profile-id').textContent        = `#${emp.id}`;
     document.getElementById('profile-firstname').textContent = emp.firstname  || '—';
     document.getElementById('profile-lastname').textContent  = emp.lastname   || '—';
     document.getElementById('profile-birthday').textContent  = emp.birthday   ? formatDate(emp.birthday) : '—';
     document.getElementById('profile-age').textContent       = age !== null   ? `${age} yrs${range ? ' · ' + range.label : ''}` : '—';
-    document.getElementById('profile-department').textContent = emp.department || '—';
+    document.getElementById('profile-department').textContent = deptName;
     document.getElementById('profile-salary').textContent    = '₱' + (emp.salary ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 });
 
-    // Wire the Edit shortcut button
     document.getElementById('profile-edit-btn').onclick = () => {
         closeProfileModal();
         openEditModal(id);
@@ -399,7 +487,7 @@ function initProfileModal() {
     document.getElementById('profile-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeProfileModal(); });
 }
 
-/* ── Add/Edit Modal ────────────────────────────────────────────────────── */
+/* ── Add/Edit Employee Modal ───────────────────────────────────────────── */
 function initModal() {
     addEmpBtn.addEventListener('click', openAddModal);
     document.getElementById('modal-close').addEventListener('click', closeModal);
@@ -413,6 +501,7 @@ function openAddModal() {
     document.getElementById('modal-title').textContent = 'Add Employee';
     document.getElementById('save-btn').querySelector('.btn-text').textContent = 'Save Employee';
     clearModalForm();
+    populateDeptDropdown_modal();
     document.getElementById('emp-modal').classList.remove('hidden');
 }
 
@@ -422,12 +511,16 @@ window.openEditModal = function(id) {
     editingId = id;
     document.getElementById('modal-title').textContent = 'Edit Employee';
     document.getElementById('save-btn').querySelector('.btn-text').textContent = 'Update Employee';
-    document.getElementById('emp-id').value         = emp.id;
-    document.getElementById('emp-firstname').value  = emp.firstname  || '';
-    document.getElementById('emp-lastname').value   = emp.lastname   || '';
-    document.getElementById('emp-birthday').value   = emp.birthday   ? formatDateInput(emp.birthday) : '';
-    document.getElementById('emp-department').value = emp.department || '';
-    document.getElementById('emp-salary').value     = emp.salary     ?? '';
+    document.getElementById('emp-id').value        = emp.id;
+    document.getElementById('emp-firstname').value = emp.firstname  || '';
+    document.getElementById('emp-lastname').value  = emp.lastname   || '';
+    document.getElementById('emp-birthday').value  = emp.birthday   ? formatDateInput(emp.birthday) : '';
+    document.getElementById('emp-salary').value    = emp.salary     ?? '';
+    populateDeptDropdown_modal();
+    // Pre-select existing department
+    if (emp.department?.id) {
+        document.getElementById('emp-department').value = emp.department.id;
+    }
     clearModalErrors();
     document.getElementById('emp-modal').classList.remove('hidden');
 };
@@ -438,18 +531,22 @@ function closeModal() {
 }
 
 function clearModalForm() {
-    ['emp-firstname','emp-lastname','emp-birthday','emp-department','emp-salary'].forEach(id => {
+    ['emp-firstname','emp-lastname','emp-birthday','emp-salary'].forEach(id => {
         document.getElementById(id).value = '';
         document.getElementById(id).classList.remove('invalid');
     });
+    const deptSel = document.getElementById('emp-department');
+    if (deptSel) { deptSel.value = ''; deptSel.classList.remove('invalid'); }
     clearModalErrors();
 }
 
 function clearModalErrors() {
     ['efn-err','eln-err','ebd-err','edept-err','esal-err'].forEach(id => {
-        document.getElementById(id).textContent = '';
+        const el = document.getElementById(id);
+        if (el) el.textContent = '';
     });
-    document.getElementById('modal-alert').className = 'alert hidden';
+    const alert = document.getElementById('modal-alert');
+    if (alert) alert.className = 'alert hidden';
 }
 
 function validateEmpForm() {
@@ -458,13 +555,15 @@ function validateEmpForm() {
     const dept = document.getElementById('emp-department');
     const sal  = document.getElementById('emp-salary');
     if (!ln.value.trim())   { setFErr(ln,   'eln-err',   'Last name is required.');             ok = false; }
-    if (!dept.value.trim()) { setFErr(dept, 'edept-err', 'Department is required.');            ok = false; }
+    if (!dept.value)        { setFErr(dept, 'edept-err', 'Department is required.');            ok = false; }
     if (!sal.value || isNaN(sal.value) || Number(sal.value) < 0) { setFErr(sal, 'esal-err', 'Enter a valid salary (≥ 0).'); ok = false; }
     return ok;
 }
+
 function setFErr(inp, errId, msg) {
     inp.classList.add('invalid');
-    document.getElementById(errId).textContent = msg;
+    const el = document.getElementById(errId);
+    if (el) el.textContent = msg;
 }
 
 async function saveEmployee() {
@@ -475,11 +574,11 @@ async function saveEmployee() {
     btn.querySelector('.btn-spinner').classList.remove('hidden');
 
     const payload = {
-        firstname:  document.getElementById('emp-firstname').value.trim(),
-        lastname:   document.getElementById('emp-lastname').value.trim(),
-        birthday:   document.getElementById('emp-birthday').value || null,
-        department: document.getElementById('emp-department').value.trim(),
-        salary:     parseFloat(document.getElementById('emp-salary').value)
+        firstname:    document.getElementById('emp-firstname').value.trim(),
+        lastname:     document.getElementById('emp-lastname').value.trim(),
+        birthday:     document.getElementById('emp-birthday').value || null,
+        departmentId: parseInt(document.getElementById('emp-department').value),
+        salary:       parseFloat(document.getElementById('emp-salary').value)
     };
 
     try {
@@ -490,7 +589,7 @@ async function saveEmployee() {
 
         if (res.ok) {
             closeModal();
-            await loadEmployees();
+            await loadEmployees(currentPage);
             loadStats();
             showToast(editingId ? 'Employee updated!' : 'Employee added!', 'success');
         } else {
@@ -531,7 +630,9 @@ async function doDelete() {
         const res = await fetch(`${EMP_API}/${deleteTarget}`, { method: 'DELETE' });
         if (res.ok || res.status === 204) {
             closeConfirmModal();
-            await loadEmployees();
+            // Stay on same page, but back one if it was the only record
+            const newPage = employees.length === 1 && currentPage > 0 ? currentPage - 1 : currentPage;
+            await loadEmployees(newPage);
             loadStats();
             showToast('Employee deleted.', 'success');
         } else {
@@ -539,6 +640,175 @@ async function doDelete() {
         }
     } catch (e) { showToast('Cannot connect to server.', 'error'); }
 }
+
+/* ── Department Admin CRUD ─────────────────────────────────────────────── */
+let deptEditingId   = null;
+let deptDeleteTarget = null;
+
+function initDeptAdmin() {
+    // Add button
+    const addDeptBtn = document.getElementById('add-dept-btn');
+    if (addDeptBtn) addDeptBtn.addEventListener('click', openAddDeptModal);
+
+    // Modal controls
+    document.getElementById('dept-modal-close')?.addEventListener('click', closeDeptModal);
+    document.getElementById('dept-cancel-btn')?.addEventListener('click', closeDeptModal);
+    document.getElementById('dept-save-btn')?.addEventListener('click', saveDepartment);
+    document.getElementById('dept-modal')?.addEventListener('click', e => { if (e.target === e.currentTarget) closeDeptModal(); });
+
+    // Delete modal
+    document.getElementById('dept-confirm-close')?.addEventListener('click', closeDeptConfirm);
+    document.getElementById('dept-confirm-cancel')?.addEventListener('click', closeDeptConfirm);
+    document.getElementById('dept-confirm-delete')?.addEventListener('click', doDeleteDept);
+    document.getElementById('dept-confirm-modal')?.addEventListener('click', e => { if (e.target === e.currentTarget) closeDeptConfirm(); });
+}
+
+/* ── Department pagination state ───────────────────────────────────────── */
+let deptCurrentPage = 0;
+const DEPT_PAGE_SIZE = 5;
+
+async function loadDeptTable(page) {
+    if (page === undefined) page = deptCurrentPage;
+    deptCurrentPage = page;
+    await loadDepartments();
+    const tbody = document.getElementById('dept-table-body');
+    if (!tbody) return;
+    if (!departments.length) {
+        tbody.innerHTML = '<tr><td colspan="3" class="loading-row">No departments yet.</td></tr>';
+        renderDeptPagination(0, 0, 0);
+        return;
+    }
+    const totalDept = departments.length;
+    const totalDeptPages = Math.ceil(totalDept / DEPT_PAGE_SIZE);
+    deptCurrentPage = Math.min(deptCurrentPage, Math.max(0, totalDeptPages - 1));
+    const start = deptCurrentPage * DEPT_PAGE_SIZE;
+    const pageItems = departments.slice(start, start + DEPT_PAGE_SIZE);
+
+    tbody.innerHTML = pageItems.map(d => `
+        <tr>
+            <td>#${d.id}</td>
+            <td>${esc(d.name)}</td>
+            <td>
+                <div class="action-btns">
+                    <button class="btn-edit" onclick="openEditDeptModal(${d.id}, '${esc(d.name)}')" title="Edit">
+                        <svg viewBox="0 0 20 20" fill="none"><path d="M4 13.5V16h2.5l7.372-7.372-2.5-2.5L4 13.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M13.872 4.128a1.768 1.768 0 012.5 2.5l-1.128 1.128-2.5-2.5 1.128-1.128z" stroke="currentColor" stroke-width="1.3"/></svg>
+                    </button>
+                    <button class="btn-delete" onclick="openDeleteDeptModal(${d.id}, '${esc(d.name)}')" title="Delete">
+                        <svg viewBox="0 0 20 20" fill="none"><path d="M5 6h10l-1 10H6L5 6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M3 6h14M8 6V4h4v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+                    </button>
+                </div>
+            </td>
+        </tr>`).join('');
+
+    renderDeptPagination(deptCurrentPage, totalDeptPages, totalDept);
+}
+
+function renderDeptPagination(current, total, totalItems) {
+    const container = document.getElementById('dept-pagination');
+    if (!container) return;
+    if (total <= 1) { container.style.display = 'none'; container.innerHTML = ''; return; }
+    container.style.display = 'flex';
+    const prevDis = current === 0 ? 'disabled' : '';
+    const nextDis = current >= total - 1 ? 'disabled' : '';
+    container.innerHTML = `
+        <span class="page-info">Page ${current + 1} of ${total} &nbsp;·&nbsp; ${totalItems} departments</span>
+        <div class="page-btns">
+            <button class="page-btn" onclick="loadDeptTable(${current - 1})" ${prevDis}>‹ Prev</button>
+            ${buildPageButtons(current, total, 'loadDeptTable')}
+            <button class="page-btn" onclick="loadDeptTable(${current + 1})" ${nextDis}>Next ›</button>
+        </div>`;
+}
+
+function openAddDeptModal() {
+    deptEditingId = null;
+    document.getElementById('dept-modal-title').textContent = 'Add Department';
+    document.getElementById('dept-name-input').value = '';
+    document.getElementById('dept-name-err').textContent = '';
+    document.getElementById('dept-modal-alert').className = 'alert hidden';
+    document.getElementById('dept-modal').classList.remove('hidden');
+}
+
+window.openEditDeptModal = function(id, name) {
+    deptEditingId = id;
+    document.getElementById('dept-modal-title').textContent = 'Edit Department';
+    document.getElementById('dept-name-input').value = name;
+    document.getElementById('dept-name-err').textContent = '';
+    document.getElementById('dept-modal-alert').className = 'alert hidden';
+    document.getElementById('dept-modal').classList.remove('hidden');
+};
+
+function closeDeptModal() {
+    document.getElementById('dept-modal').classList.add('hidden');
+    deptEditingId = null;
+}
+
+async function saveDepartment() {
+    const nameInput = document.getElementById('dept-name-input');
+    const name = nameInput.value.trim();
+    document.getElementById('dept-name-err').textContent = '';
+
+    if (!name) {
+        document.getElementById('dept-name-err').textContent = 'Department name is required.';
+        nameInput.classList.add('invalid');
+        return;
+    }
+    nameInput.classList.remove('invalid');
+
+    const payload = { name };
+    const url    = deptEditingId ? `${DEPT_API}/${deptEditingId}` : DEPT_API;
+    const method = deptEditingId ? 'PUT' : 'POST';
+
+    try {
+        const res  = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const data = await res.json();
+        if (res.ok) {
+            closeDeptModal();
+            deptCurrentPage = 0;
+            await loadDeptTable(0);
+            await loadDepartments();  // refresh dropdown cache
+            showToast(deptEditingId ? 'Department updated!' : 'Department added!', 'success');
+        } else {
+            document.getElementById('dept-modal-alert').textContent = data.error || 'Save failed.';
+            document.getElementById('dept-modal-alert').className = 'alert error';
+        }
+    } catch (e) {
+        document.getElementById('dept-modal-alert').textContent = 'Cannot connect to server.';
+        document.getElementById('dept-modal-alert').className = 'alert error';
+    }
+}
+
+window.openDeleteDeptModal = function(id, name) {
+    deptDeleteTarget = id;
+    document.getElementById('dept-confirm-name').textContent = name;
+    document.getElementById('dept-confirm-modal').classList.remove('hidden');
+};
+
+function closeDeptConfirm() {
+    document.getElementById('dept-confirm-modal').classList.add('hidden');
+    deptDeleteTarget = null;
+}
+
+async function doDeleteDept() {
+    if (!deptDeleteTarget) return;
+    try {
+        const res = await fetch(`${DEPT_API}/${deptDeleteTarget}`, { method: 'DELETE' });
+        if (res.ok || res.status === 204) {
+            closeDeptConfirm();
+            await loadDeptTable(deptCurrentPage);
+            await loadDepartments();
+            showToast('Department deleted.', 'success');
+        } else {
+            const data = await res.json();
+            closeDeptConfirm();
+            showToast(data.error || 'Delete failed.', 'error');
+        }
+    } catch (e) { showToast('Cannot connect to server.', 'error'); }
+}
+
+/* ── Report pagination state ───────────────────────────────────────────── */
+let reportCurrentPage = 0;
+const REPORT_PAGE_SIZE = 5;
+let reportFilteredAll = [];
 
 /* ── Reports ───────────────────────────────────────────────────────────── */
 const DEPT_COLORS = {
@@ -605,19 +875,19 @@ function initReportFilters() {
     const deptSel   = document.getElementById('dept-filter-select');
     const ageSel    = document.getElementById('age-filter-select');
     const statusSel = document.getElementById('report-status-filter');
-    if (deptSel)   deptSel.addEventListener('change',   applyReportFilters);
-    if (ageSel)    ageSel.addEventListener('change',    applyReportFilters);
-    if (statusSel) statusSel.addEventListener('change', () => { updatePdfLinks(); applyReportFilters(); });
+    if (deptSel)   deptSel.addEventListener('change',   () => { reportCurrentPage = 0; applyReportFilters(0); });
+    if (ageSel)    ageSel.addEventListener('change',    () => { reportCurrentPage = 0; applyReportFilters(0); });
+    if (statusSel) statusSel.addEventListener('change', () => { updatePdfLinks(); reportCurrentPage = 0; applyReportFilters(0); });
     updatePdfLinks();
 }
 
 function updatePdfLinks() {
-    const statusVal = document.getElementById('report-status-filter')?.value || '';
+    const statusVal   = document.getElementById('report-status-filter')?.value || '';
     const activeParam = statusVal === 'active' ? '?active=true' : statusVal === 'inactive' ? '?active=false' : '';
     const deptBtn = document.getElementById('pdf-dept-btn');
     const ageBtn  = document.getElementById('pdf-age-btn');
-    if (deptBtn) deptBtn.href = `http://localhost:8080/api/report/pdf/by-department${activeParam}`;
-    if (ageBtn)  ageBtn.href  = `http://localhost:8080/api/report/pdf/by-age${activeParam}`;
+    if (deptBtn) deptBtn.href = `${BASE_URL}/api/report/pdf/by-department${activeParam}`;
+    if (ageBtn)  ageBtn.href  = `${BASE_URL}/api/report/pdf/by-age${activeParam}`;
 }
 
 function triggerActiveReport() { loadReportData(); }
@@ -626,58 +896,74 @@ async function loadReportData() {
     const tbody = document.getElementById('report-body');
     tbody.innerHTML = '<tr><td colspan="7" class="loading-row">Loading…</td></tr>';
     try {
-        const res  = await fetch(EMP_API);
-        reportAllEmployees = await res.json();
-        populateDeptDropdown(reportAllEmployees);
+        // Reports use unpaginated endpoint (all records)
+        const res = await fetch(`${EMP_API}?size=10000`);
+        const data = await res.json();
+        reportAllEmployees = data.content || [];
+        populateDeptDropdown_report(reportAllEmployees);
         applyReportFilters();
     } catch (e) {
         tbody.innerHTML = '<tr><td colspan="7" class="loading-row">Failed to load report.</td></tr>';
     }
 }
 
-function populateDeptDropdown(list) {
+function populateDeptDropdown_report(list) {
     const sel = document.getElementById('dept-filter-select');
     if (!sel) return;
     const current = sel.value;
-    const depts = [...new Set((list || []).map(e => e.department).filter(Boolean))].sort();
+    const depts = [...new Set((list || [])
+        .map(e => getDeptName(e.department))
+        .filter(n => n && n !== '—'))].sort();
     sel.innerHTML = '<option value="">All Departments</option>' +
         depts.map(d => `<option value="${esc(d)}"${d === current ? ' selected' : ''}>${esc(d)}</option>`).join('');
 }
 
-function applyReportFilters() {
+function applyReportFilters(page) {
+    if (page === undefined) { reportCurrentPage = 0; page = 0; }
+    reportCurrentPage = page;
+
     const deptVal   = (document.getElementById('dept-filter-select')?.value   || '').toLowerCase();
     const ageVal    =  document.getElementById('age-filter-select')?.value    || '';
     const statusVal =  document.getElementById('report-status-filter')?.value || '';
 
     let filtered = reportAllEmployees;
-    if (deptVal) filtered = filtered.filter(e => (e.department || '').toLowerCase() === deptVal);
+    if (deptVal) filtered = filtered.filter(e => getDeptName(e.department).toLowerCase() === deptVal);
     if (ageVal)  filtered = filtered.filter(e => { const r = ageRange(calcAge(e.birthday)); return r && r.key === ageVal; });
     if (statusVal === 'active')   filtered = filtered.filter(e => e.isActive !== false);
     if (statusVal === 'inactive') filtered = filtered.filter(e => e.isActive === false);
 
     const dir = sortOrder === 'asc' ? 1 : -1;
     filtered = [...filtered].sort((a, b) => {
-        const dA = (a.department || '').localeCompare(b.department || '') * dir;
+        const dA = getDeptName(a.department).localeCompare(getDeptName(b.department)) * dir;
         if (dA !== 0) return dA;
         return ((calcAge(a.birthday) ?? 99) - (calcAge(b.birthday) ?? 99)) * dir;
     });
 
-    renderReport(filtered);
+    reportFilteredAll = filtered;
+    const totalR = filtered.length;
+    const totalRPages = Math.ceil(totalR / REPORT_PAGE_SIZE);
+    reportCurrentPage = Math.min(reportCurrentPage, Math.max(0, totalRPages - 1));
+    const start = reportCurrentPage * REPORT_PAGE_SIZE;
+    const pageSlice = filtered.slice(start, start + REPORT_PAGE_SIZE);
+
+    renderReport(pageSlice, reportCurrentPage, totalRPages, totalR);
 }
 
-function renderReport(list) {
+function renderReport(list, currentR, totalRPages, totalR) {
     const tbody = document.getElementById('report-body');
     if (!list || list.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="loading-row">No employees match the selected filters.</td></tr>';
+        renderReportPagination(0, 0, 0);
         return;
     }
     tbody.innerHTML = list.map(e => {
         const age      = calcAge(e.birthday);
         const range    = ageRange(age);
+        const deptName = getDeptName(e.department);
         const ageBadge = range
             ? `<span class="age-badge ${ageClass(range.key)}">${esc(range.label)}</span>`
             : '<span style="color:#94a3b8">—</span>';
-        const deptBadge = `<span class="dept-badge ${deptClass(e.department)}">${esc(e.department || '—')}</span>`;
+        const deptBadge = `<span class="dept-badge ${deptClass(deptName)}">${esc(deptName)}</span>`;
         const active    = e.isActive !== false;
         const pill      = active
             ? '<span class="status-pill active">Active</span>'
@@ -693,6 +979,23 @@ function renderReport(list) {
             <td>${pill}</td>
         </tr>`;
     }).join('');
+    renderReportPagination(currentR, totalRPages, totalR);
+}
+
+function renderReportPagination(current, total, totalItems) {
+    const container = document.getElementById('report-pagination');
+    if (!container) return;
+    if (total <= 1) { container.style.display = 'none'; container.innerHTML = ''; return; }
+    container.style.display = 'flex';
+    const prevDis = current === 0 ? 'disabled' : '';
+    const nextDis = current >= total - 1 ? 'disabled' : '';
+    container.innerHTML = `
+        <span class="page-info">Page ${current + 1} of ${total} &nbsp;·&nbsp; ${totalItems} records</span>
+        <div class="page-btns">
+            <button class="page-btn" onclick="applyReportFilters(${current - 1})" ${prevDis}>‹ Prev</button>
+            ${buildPageButtons(current, total, 'applyReportFilters')}
+            <button class="page-btn" onclick="applyReportFilters(${current + 1})" ${nextDis}>Next ›</button>
+        </div>`;
 }
 
 /* ── Toast ─────────────────────────────────────────────────────────────── */

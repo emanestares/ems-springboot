@@ -4,11 +4,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
-/**
- * Holds all request/response DTOs for the Auth endpoints.
- * Bundled in one file for convenience – you can split them
- * into separate files if you prefer.
- */
+
 public class AuthDtos {
 
     // ── Login ──────────────────────────────────────────────────────────────
